@@ -453,8 +453,7 @@ export function parsePdfStatementLines(
     try {
       const occurredAt = parseStatementDate(dateMatch[0]!.trim());
       let amountMinor = parseMoneyToMinor(amountRaw, input.currency);
-      amountMinor = resolveAmountSign(rest, amountMinor);
-      amountMinor = applyTitleSignHints(rest, amountMinor);
+      amountMinor = applyTitleSignHints(rest, amountMinor, amountRaw);
 
       const title = (rest || "Импорт выписки").slice(0, 120);
       if (amountMinor === 0) {

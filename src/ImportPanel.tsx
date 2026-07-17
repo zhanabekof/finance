@@ -7,7 +7,8 @@ import {
 import { formatMoney } from "./money";
 import {
   listStatementPresets,
-  parseBankStatementCsv,
+  MAX_STATEMENT_BYTES,
+  parseBankStatementPdf,
   type ParsedStatementRow,
   type StatementBankPresetId,
   type StatementParseResult,
@@ -86,19 +87,22 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
       setError("Сначала выберите счёт");
       return;
     }
-    if (!/\.csv$/i.test(file.name) && file.type && !file.type.includes("csv") && file.type !== "text/plain") {
-      setError("Поддерживается CSV-выписка (.csv)");
+    const isPdf =
+      /\.pdf$/i.test(file.name) ||
+      file.type === "application/pdf";
+    if (!isPdf) {
+      setError("Поддерживается PDF-выписка (.pdf)");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Файл слишком большой (максимум 2 МБ)");
+    if (file.size > MAX_STATEMENT_BYTES) {
+      setError("Файл слишком большой (максимум 8 МБ)");
       return;
     }
 
     setBusy(true);
     try {
-      const text = await file.text();
-      const parsed = parseBankStatementCsv(text, {
+      const data = await file.arrayBuffer();
+      const parsed = await parseBankStatementPdf(data, {
         currency: selectedAccount.currency,
         presetId,
       });
@@ -113,6 +117,7 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
       );
       setNotice(
         `Распознано ${parsed.rows.length} операций` +
+          (parsed.pageCount ? ` · ${parsed.pageCount} стр.` : "") +
           (parsed.issues.length > 0 ? `, ошибок строк: ${parsed.issues.length}` : "") +
           (parsed.skipped > 0 ? `, пропущено нулевых: ${parsed.skipped}` : ""),
       );
@@ -192,8 +197,9 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
           <p className="eyebrow">Выписки</p>
           <h2>Импорт</h2>
           <p className="muted">
-            Загрузите CSV из банка, проверьте строки и запишите операции на счёт.
-            Файл остаётся только на этом устройстве.
+            Загрузите PDF-выписку из банка, проверьте строки и запишите операции на
+            счёт. Нужен PDF с текстовым слоем (не скан). Файл остаётся только на
+            этом устройстве.
           </p>
         </div>
       </header>
@@ -232,7 +238,7 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
           </label>
 
           <label>
-            <span>Формат банка</span>
+            <span>Банк</span>
             <select
               value={presetId}
               onChange={(e) =>
@@ -290,7 +296,7 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv,text/plain"
+            accept=".pdf,application/pdf"
             hidden
             onChange={(e) => onFileChosen(e.currentTarget.files?.[0] ?? null)}
           />
@@ -300,7 +306,7 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
             disabled={busy || accountId === ""}
             onClick={() => fileInputRef.current?.click()}
           >
-            {busy ? "Читаю файл…" : "Выбрать CSV"}
+            {busy ? "Читаю PDF…" : "Выбрать PDF"}
           </button>
           <button
             type="button"
@@ -313,7 +319,7 @@ export function ImportPanel({ accounts, categories, onImported }: Props) {
           <span className="muted">
             {fileName
               ? `${fileName}${parseResult ? ` · ${parseResult.presetId}` : ""}`
-              : "CSV до 2 МБ, до 2000 строк"}
+              : "PDF до 8 МБ, текстовый слой"}
           </span>
         </div>
 
