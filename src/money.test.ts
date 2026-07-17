@@ -263,6 +263,7 @@ describe("statement import", () => {
     ].join("\n");
 
     const result = parseBankStatementCsv(csv, { currency: "KZT", presetId: "kaspi" });
+    expect(result.source).toBe("csv");
     expect(result.rows).toHaveLength(2);
     expect(result.skipped).toBe(1);
     expect(result.rows[0]?.amountMinor).toBe(-150050);
@@ -283,11 +284,35 @@ describe("statement import", () => {
 
     expect(() =>
       assertStatementFileLimits({ byteLength: MAX_STATEMENT_BYTES + 1, textLength: 10 }),
-    ).toThrow(/2 МБ/);
+    ).toThrow(/8 МБ/);
   });
 
   it("splits quoted CSV fields", () => {
     expect(splitCsvLine('a,"b,c",d', ",")).toEqual(["a", "b,c", "d"]);
-    expect(parseStatementDate("01/02/2026")).toBe("2026-02-01T00:00:00.000Z");
+    expect(parseStatementDate("01/02/2026")).toBe("2026-02-01T12:00:00.000Z");
+  });
+
+  it("parses PDF text lines with dates and amounts", async () => {
+    const { parsePdfStatementLines } = await import("./statementImport");
+    const result = parsePdfStatementLines(
+      [
+        "Выписка Kaspi",
+        "15.07.2026 Magnum -1 500,50",
+        "16.07.2026 Пополнение зарплата +250 000,00",
+        "Итого 0",
+        "17.07.2026 Coffee Shop",
+        "-450,00",
+      ],
+      { currency: "KZT", presetId: "auto" },
+    );
+
+    expect(result.source).toBe("pdf");
+    expect(result.presetId).toBe("kaspi");
+    expect(result.rows).toHaveLength(3);
+    expect(result.rows[0]?.amountMinor).toBe(-150050);
+    expect(result.rows[1]?.amountMinor).toBe(25000000);
+    expect(result.rows[1]?.kind).toBe("income");
+    expect(result.rows[2]?.title).toBe("Coffee Shop");
+    expect(result.rows[2]?.amountMinor).toBe(-45000);
   });
 });

@@ -360,7 +360,7 @@ const EXPENSE_HINT =
   /списан|оплат|покупк|перевод\s+с|withdrawal|purchase|payment|debit|комисс/i;
 
 const NOISE_LINE =
-  /^(стр\.|страница|page|итого|total|баланс|balance|выписка|statement|период|period|счет|account|клиент|fio|бИН|иИН)/i;
+  /^(стр\.|страница|page|итого|total|баланс|balance|выписка|statement|период|period|счет|счёт|account|клиент|бин|иин)/i;
 
 function inferPdfBank(lines: string[]): Exclude<StatementBankPresetId, "auto"> {
   const sample = lines.slice(0, 40).join(" ").toLowerCase();
