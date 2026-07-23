@@ -41,6 +41,15 @@ import "./App.css";
 type Tab = "overview" | "transactions" | "budget" | "goals" | "import" | "categories";
 type BudgetScope = "month" | "year";
 
+const NAV_ITEMS: Array<{ id: Tab; label: string }> = [
+  { id: "overview", label: "Обзор" },
+  { id: "transactions", label: "Операции" },
+  { id: "budget", label: "Бюджет" },
+  { id: "goals", label: "Цели" },
+  { id: "import", label: "Импорт" },
+  { id: "categories", label: "Категории" },
+];
+
 const MONTH_LABELS = [
   "Янв",
   "Фев",
@@ -100,6 +109,7 @@ function draftMinorOrZero(value: string, currency: string): number {
 
 function App() {
   const [tab, setTab] = useState<Tab>("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingBudget, setSavingBudget] = useState(false);
   const [savingTransaction, setSavingTransaction] = useState(false);
@@ -183,6 +193,29 @@ function App() {
       ? draftIncomePlanMinor
       : draftMinorOrZero(plannedIncome, primaryCurrency);
   const draftFreeMinor = effectiveDraftIncomeMinor - draftExpensePlanMinor;
+
+  function goToTab(next: Tab) {
+    setTab(next);
+    setMenuOpen(false);
+  }
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [menuOpen]);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -455,12 +488,12 @@ function App() {
       if (budgetScope === "month") {
         const next = await copyBudgetToNextMonth(yearMonth);
         setYearMonth(next);
-        setNotice(`Бюджет скопирован на ${next}`);
+        setNotice(`План перенесён на ${next}. Операции не изменены.`);
       } else {
         const next = await copyYearBudgetToNextYear(budgetYear);
         setBudgetYear(next);
         setBudgetYearDraft(next);
-        setNotice(`Годовой бюджет скопирован на ${next}`);
+        setNotice(`Годовой план перенесён на ${next}. Операции не изменены.`);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -526,59 +559,32 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="rail">
-        <div className="brand">
-          <p className="brand-mark">Ledger</p>
-          <h1>Finance</h1>
-          <p className="brand-sub">Личный бюджет на одного</p>
+    <div className={`app-shell${menuOpen ? " menu-open" : ""}`}>
+      <header className="mobile-chrome">
+        <div className="mobile-chrome-brand">
+          <strong>Finance</strong>
         </div>
-        <nav className="nav" aria-label="Разделы">
-          <button
-            type="button"
-            className={tab === "overview" ? "nav-item active" : "nav-item"}
-            onClick={() => setTab("overview")}
-          >
-            Обзор
-          </button>
-          <button
-            type="button"
-            className={tab === "transactions" ? "nav-item active" : "nav-item"}
-            onClick={() => setTab("transactions")}
-          >
-            Операции
-          </button>
-          <button
-            type="button"
-            className={tab === "budget" ? "nav-item active" : "nav-item"}
-            onClick={() => setTab("budget")}
-          >
-            Бюджет
-          </button>
-          <button
-            type="button"
-            className={tab === "goals" ? "nav-item active" : "nav-item"}
-            onClick={() => setTab("goals")}
-          >
-            Цели
-          </button>
-          <button
-            type="button"
-            className={tab === "import" ? "nav-item active" : "nav-item"}
-            onClick={() => setTab("import")}
-          >
-            Импорт
-          </button>
-          <button
-            type="button"
-            className={tab === "categories" ? "nav-item active" : "nav-item"}
-            onClick={() => setTab("categories")}
-          >
-            Категории
-          </button>
-        </nav>
-        <p className="rail-note">Данные только на этом устройстве</p>
-      </aside>
+        <button
+          type="button"
+          className={`burger${menuOpen ? " open" : ""}`}
+          aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+          aria-expanded={menuOpen}
+          aria-controls="app-nav"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      </header>
+
+      <button
+        type="button"
+        className="menu-backdrop"
+        aria-label="Закрыть меню"
+        tabIndex={menuOpen ? 0 : -1}
+        onClick={() => setMenuOpen(false)}
+      />
 
       <main className="stage">
         {error && (
@@ -604,9 +610,9 @@ function App() {
                   budgetDraftsDirtyRef.current = false;
                   setYearMonth(overviewMonth);
                 }
-                setTab("budget");
+                goToTab("budget");
               }}
-              onOpenTransactions={() => setTab("transactions")}
+              onOpenTransactions={() => goToTab("transactions")}
             />
           ) : (
             <p className="muted">Загрузка обзора…</p>
@@ -832,62 +838,65 @@ function App() {
 
         {tab === "budget" && (
           <section className="panel budget-panel">
-            <header className="panel-head">
+            <header className="panel-head budget-head">
               <div>
                 <p className="eyebrow">
                   {budgetScope === "month" ? "План на месяц" : "План на год"}
                 </p>
                 <h2>Бюджет</h2>
               </div>
-              <div className="budget-controls">
-                <div className="kind-toggle" role="group" aria-label="Период бюджета">
-                  <button
-                    type="button"
-                    className={budgetScope === "month" ? "active" : ""}
-                    onClick={() => {
-                      budgetDraftsDirtyRef.current = false;
-                      setBudgetScope("month");
-                    }}
-                  >
-                    Месяц
-                  </button>
-                  <button
-                    type="button"
-                    className={budgetScope === "year" ? "active" : ""}
-                    onClick={() => {
-                      budgetDraftsDirtyRef.current = false;
-                      setBudgetScope("year");
-                    }}
-                  >
-                    Год
-                  </button>
-                </div>
-                {budgetScope === "month" ? (
-                  <label>
-                    Месяц
-                    <input
-                      type="month"
-                      value={isYearMonth(yearMonth) ? yearMonth : currentYearMonth()}
-                      onChange={(e) => commitYearMonth(e.currentTarget.value)}
-                    />
-                  </label>
-                ) : (
-                  <label>
-                    Год
-                    <input
-                      type="number"
-                      min="2000"
-                      max="2100"
-                      value={budgetYearDraft}
-                      onChange={(e) => onBudgetYearDraftChange(e.currentTarget.value)}
-                      onBlur={onBudgetYearBlur}
-                    />
-                  </label>
-                )}
+            </header>
+
+            <div className="budget-toolbar">
+              <div className="kind-toggle" role="group" aria-label="Период бюджета">
+                <button
+                  type="button"
+                  className={budgetScope === "month" ? "active" : ""}
+                  onClick={() => {
+                    budgetDraftsDirtyRef.current = false;
+                    setBudgetScope("month");
+                  }}
+                >
+                  Месяц
+                </button>
+                <button
+                  type="button"
+                  className={budgetScope === "year" ? "active" : ""}
+                  onClick={() => {
+                    budgetDraftsDirtyRef.current = false;
+                    setBudgetScope("year");
+                  }}
+                >
+                  Год
+                </button>
+              </div>
+
+              {budgetScope === "month" ? (
+                <label className="budget-period-field">
+                  <span>Месяц</span>
+                  <input
+                    type="month"
+                    value={isYearMonth(yearMonth) ? yearMonth : currentYearMonth()}
+                    onChange={(e) => commitYearMonth(e.currentTarget.value)}
+                  />
+                </label>
+              ) : (
+                <label className="budget-period-field">
+                  <span>Год</span>
+                  <input
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    value={budgetYearDraft}
+                    onChange={(e) => onBudgetYearDraftChange(e.currentTarget.value)}
+                    onBlur={onBudgetYearBlur}
+                  />
+                </label>
+              )}
+
+              <div className="budget-toolbar-actions">
                 <button type="button" className="ghost" onClick={onCopyBudget}>
-                  {budgetScope === "month"
-                    ? "Копировать на следующий месяц"
-                    : "Копировать на следующий год"}
+                  {budgetScope === "month" ? "На следующий месяц" : "На следующий год"}
                 </button>
                 {budgetScope === "year" && (
                   <button type="button" className="ghost" onClick={onApplyYearToMonths}>
@@ -895,7 +904,7 @@ function App() {
                   </button>
                 )}
               </div>
-            </header>
+            </div>
 
             {budgetScope === "year" && yearBudgetSummary && (
               <div className="year-months">
@@ -1176,7 +1185,16 @@ function App() {
           </section>
         )}
 
-        {tab === "goals" && <GoalsPanel currency={primaryCurrency} />}
+        {tab === "goals" && (
+          <GoalsPanel
+            currency={primaryCurrency}
+            accounts={accounts}
+            onChanged={async () => {
+              setNotice("Пополнение цели записано в операции");
+              await refresh();
+            }}
+          />
+        )}
 
         {tab === "import" && (
           <ImportPanel
@@ -1198,6 +1216,26 @@ function App() {
           />
         )}
       </main>
+
+      <aside className="rail" id="app-nav">
+        <div className="brand">
+          <h1>Finance</h1>
+        </div>
+        <nav className="nav" aria-label="Разделы">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={tab === item.id ? "nav-item active" : "nav-item"}
+              onClick={() => goToTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <p className="rail-note">Данные только на этом устройстве</p>
+      </aside>
+
     </div>
   );
 }

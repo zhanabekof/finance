@@ -175,6 +175,27 @@ pub fn run() {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "goal_contribution_transaction_link",
+            sql: "
+                PRAGMA foreign_keys = ON;
+
+                ALTER TABLE goal_contributions
+                    ADD COLUMN transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL;
+
+                CREATE INDEX IF NOT EXISTS idx_goal_contributions_transaction_id
+                    ON goal_contributions(transaction_id);
+
+                INSERT INTO categories (name, kind, is_essential, archived)
+                SELECT 'Накопления', 'expense', 0, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM categories
+                    WHERE name = 'Накопления' AND kind = 'expense' AND archived = 0
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

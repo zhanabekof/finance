@@ -6,6 +6,7 @@ import {
   listGoalContributions,
   listGoals,
   updateGoal,
+  type Account,
   type GoalContribution,
   type GoalSummary,
 } from "./db";
@@ -18,6 +19,7 @@ import { formatMoney } from "./money";
 
 type Props = {
   currency: string;
+  accounts: Account[];
   onChanged?: () => void;
 };
 
@@ -30,6 +32,7 @@ type EditorState = {
 
 type ContributeState = {
   goalId: number;
+  accountId: number | "";
   amount: string;
   note: string;
 };
@@ -166,7 +169,7 @@ function progressLabel(progress: GoalProgress): string {
   return "В процессе";
 }
 
-export function GoalsPanel({ currency, onChanged }: Props) {
+export function GoalsPanel({ currency, accounts, onChanged }: Props) {
   const [goals, setGoals] = useState<GoalSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -177,6 +180,12 @@ export function GoalsPanel({ currency, onChanged }: Props) {
   const [history, setHistory] = useState<GoalContribution[]>([]);
   const [pendingArchiveId, setPendingArchiveId] = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+
+  const accountsForCurrency = useMemo(
+    () => accounts.filter((account) => account.currency === currency && account.archived === 0),
+    [accounts, currency],
+  );
+  const defaultAccountId = accountsForCurrency[0]?.id ?? "";
 
   async function reload() {
     const rows = await listGoals(showArchived);
@@ -259,11 +268,16 @@ export function GoalsPanel({ currency, onChanged }: Props) {
     if (!contribute) {
       return;
     }
+    if (contribute.accountId === "") {
+      setError("Выберите счёт для операции");
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
       await addGoalContribution({
         goalId: contribute.goalId,
+        accountId: contribute.accountId,
         amountInput: contribute.amount,
         note: contribute.note,
       });
@@ -345,8 +359,8 @@ export function GoalsPanel({ currency, onChanged }: Props) {
           <p className="eyebrow">Горизонт</p>
           <h2>Цели</h2>
           <p className="muted">
-            Накопления к сроку: прогресс считается из пополнений, операции не
-            меняются.
+            Пополнение цели создаёт расход на выбранном счёте в категории
+            «Накопления» и увеличивает прогресс цели.
           </p>
         </div>
         <div className="goals-totals">
@@ -687,6 +701,7 @@ export function GoalsPanel({ currency, onChanged }: Props) {
                           onClick={() =>
                             setContribute({
                               goalId: goal.id,
+                              accountId: defaultAccountId,
                               amount: "",
                               note: "",
                             })
@@ -745,6 +760,31 @@ export function GoalsPanel({ currency, onChanged }: Props) {
                     {isContributing && contribute && (
                       <form className="goal-contribute" onSubmit={onSubmitContribution}>
                         <label>
+                          <span>Счёт</span>
+                          <select
+                            value={contribute.accountId}
+                            onChange={(e) => {
+                              const value =
+                                e.currentTarget.value === ""
+                                  ? ""
+                                  : Number(e.currentTarget.value);
+                              setContribute((prev) =>
+                                prev ? { ...prev, accountId: value } : prev,
+                              );
+                            }}
+                            required
+                          >
+                            {accountsForCurrency.length === 0 && (
+                              <option value="">Нет счетов в {currency}</option>
+                            )}
+                            {accountsForCurrency.map((account) => (
+                              <option key={account.id} value={account.id}>
+                                {account.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
                           <span>Сумма</span>
                           <input
                             className="mono"
@@ -782,7 +822,10 @@ export function GoalsPanel({ currency, onChanged }: Props) {
                           >
                             Отмена
                           </button>
-                          <button type="submit" disabled={busy}>
+                          <button
+                            type="submit"
+                            disabled={busy || contribute.accountId === ""}
+                          >
                             {busy ? "…" : "Добавить"}
                           </button>
                         </div>

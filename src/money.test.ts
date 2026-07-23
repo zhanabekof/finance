@@ -23,6 +23,8 @@ import {
   assertStatementFileLimits,
   MAX_STATEMENT_BYTES,
   parseBankStatementCsv,
+  parseKaspiGoldStatementLines,
+  parsePdfStatementLines,
   parseStatementDate,
   splitCsvLine,
 } from "./statementImport";
@@ -292,27 +294,42 @@ describe("statement import", () => {
     expect(parseStatementDate("01/02/2026")).toBe("2026-02-01T12:00:00.000Z");
   });
 
-  it("parses PDF text lines with dates and amounts", async () => {
-    const { parsePdfStatementLines } = await import("./statementImport");
-    const result = parsePdfStatementLines(
+  it("parses Kaspi Gold PDF lines with YY dates and tenge amounts", () => {
+    expect(parseStatementDate("17.07.26")).toBe("2026-07-17T12:00:00.000Z");
+
+    const result = parseKaspiGoldStatementLines(
       [
-        "Выписка Kaspi",
-        "15.07.2026 Magnum -1 500,50",
-        "16.07.2026 Пополнение зарплата +250 000,00",
-        "Итого 0",
-        "17.07.2026 Coffee Shop",
-        "-450,00",
+        "ВЫПИСКА",
+        "по Kaspi Gold за период с 18.07.25 по 18.07.26",
+        "Дата Сумма Операция Детали",
+        "17.07.26 - 2 400,00 ₸ Покупка ИП АЛИ КҮШ",
+        "16.07.26 + 49 400,00 ₸ Пополнение С карты другого банка",
+        "14.07.26 - 11 095,17 ₸ Покупка OPENAI *CHATGPT SUBSCR",
+        "(- 23,20 USD)",
+        "04.07.26 + 1 669,00 ₸ Покупка WOLT.COM",
+        "Доступно на 18.07.26 + 19 801,28 ₸",
       ],
-      { currency: "KZT", presetId: "auto" },
+      { currency: "KZT" },
     );
 
-    expect(result.source).toBe("pdf");
     expect(result.presetId).toBe("kaspi");
-    expect(result.rows).toHaveLength(3);
-    expect(result.rows[0]?.amountMinor).toBe(-150050);
-    expect(result.rows[1]?.amountMinor).toBe(25000000);
+    expect(result.rows).toHaveLength(4);
+    expect(result.rows[0]).toMatchObject({
+      title: "Покупка ИП АЛИ КҮШ",
+      amountMinor: -240000,
+      kind: "expense",
+    });
+    expect(result.rows[1]?.amountMinor).toBe(4940000);
     expect(result.rows[1]?.kind).toBe("income");
-    expect(result.rows[2]?.title).toBe("Coffee Shop");
-    expect(result.rows[2]?.amountMinor).toBe(-45000);
+    expect(result.rows[2]?.amountMinor).toBe(-1109517);
+    expect(result.rows[3]?.amountMinor).toBe(166900);
+    expect(result.rows[3]?.kind).toBe("income");
+
+    const auto = parsePdfStatementLines(
+      ["АО «Kaspi Bank»", "17.07.26 - 900,00 ₸ Покупка Magnum"],
+      { currency: "KZT", presetId: "auto" },
+    );
+    expect(auto.presetId).toBe("kaspi");
+    expect(auto.rows[0]?.amountMinor).toBe(-90000);
   });
 });

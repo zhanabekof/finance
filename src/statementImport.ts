@@ -58,7 +58,7 @@ type BankPreset = {
 const BANK_PRESETS: BankPreset[] = [
   {
     id: "kaspi",
-    label: "Kaspi",
+    label: "Kaspi Gold",
     aliases: {
       date: ["дата", "date", "дата операции", "дата транзакции"],
       title: ["описание", "назначение", "детали", "операция", "details", "merchant"],
@@ -284,6 +284,11 @@ export function parseMoneyToMinor(raw: string, currency: string): number {
   return negative ? -minor : minor;
 }
 
+function expandTwoDigitYear(yy: number): number {
+  // Выписки свежие: 00–79 → 2000–2079, 80–99 → 1980–1999
+  return yy >= 80 ? 1900 + yy : 2000 + yy;
+}
+
 export function parseStatementDate(raw: string): string {
   const value = raw.trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[ T].*)?$/.exec(value);
@@ -291,11 +296,22 @@ export function parseStatementDate(raw: string): string {
     return `${iso[1]}-${iso[2]}-${iso[3]}T12:00:00.000Z`;
   }
 
-  const dmy = /^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/.exec(value);
-  if (dmy) {
-    const day = dmy[1]!.padStart(2, "0");
-    const month = dmy[2]!.padStart(2, "0");
-    const year = dmy[3]!;
+  const dmyLong =
+    /^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/.exec(value);
+  if (dmyLong) {
+    const day = dmyLong[1]!.padStart(2, "0");
+    const month = dmyLong[2]!.padStart(2, "0");
+    const year = dmyLong[3]!;
+    return `${year}-${month}-${day}T12:00:00.000Z`;
+  }
+
+  // Kaspi Gold: 17.07.26
+  const dmyShort =
+    /^(\d{1,2})[./](\d{1,2})[./](\d{2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/.exec(value);
+  if (dmyShort) {
+    const day = dmyShort[1]!.padStart(2, "0");
+    const month = dmyShort[2]!.padStart(2, "0");
+    const year = String(expandTwoDigitYear(Number(dmyShort[3])));
     return `${year}-${month}-${day}T12:00:00.000Z`;
   }
 
@@ -349,10 +365,17 @@ export function assertStatementFileLimits(input: {
 }
 
 const DATE_PREFIX =
-  /^(\d{1,2}[./]\d{1,2}[./]\d{4}|\d{4}-\d{2}-\d{2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?/;
+  /^(\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?/;
 
 const AMOUNT_TAIL =
   /([+-]?\(?\d{1,3}(?:[\s\u00a0]\d{3})*(?:[.,]\d{1,2})?\)?|[+-]?\d+[.,]\d{1,2}|\(\d{1,3}(?:[\s\u00a0]\d{3})*(?:[.,]\d{1,2})?\))\s*$/;
+
+/** Строка операции Kaspi Gold: `17.07.26 - 2 400,00 ₸ Покупка …` */
+const KASPI_GOLD_LINE =
+  /^(\d{2}\.\d{2}\.\d{2})\s+([+-])\s+([\d\s\u00a0]+,\d{2})\s*₸\s+(.+)$/;
+
+/** Эквивалент в валюте на отдельной строке: `(- 23,20 USD)` */
+const KASPI_FX_NOTE = /^\([+-]?\s*[\d\s\u00a0]+,\d{2}\s+[A-Z]{3}\)$/;
 
 const INCOME_HINT =
   /пополнен|зачислен|приход|перевод\s+на|incoming|deposit|salary|зарплат|возврат|refund|credit/i;
@@ -360,16 +383,31 @@ const EXPENSE_HINT =
   /списан|оплат|покупк|перевод\s+с|withdrawal|purchase|payment|debit|комисс/i;
 
 const NOISE_LINE =
-  /^(стр\.|страница|page|итого|total|баланс|balance|выписка|statement|период|period|счет|счёт|account|клиент|бин|иин)/i;
+  /^(стр\.|страница|page|итого|total|баланс|balance|выписка|statement|период|period|счет|счёт|account|клиент|бин|иин|справка|приложение|дата\s+сумма|доступно\s+на|пополнения|поступления|зачисления|переводы|покупки|снятия|разное|краткое\s+содержание|лимит\s+на)/i;
 
 function inferPdfBank(lines: string[]): Exclude<StatementBankPresetId, "auto"> {
-  const sample = lines.slice(0, 40).join(" ").toLowerCase();
+  const sample = lines.slice(0, 80).join(" ").toLowerCase();
   if (sample.includes("kaspi")) return "kaspi";
   if (sample.includes("halyk") || sample.includes("халык") || sample.includes("народный банк")) {
     return "halyk";
   }
   if (/[а-яё]/i.test(sample)) return "generic_ru";
   return "generic_en";
+}
+
+function looksLikeKaspiGold(lines: string[]): boolean {
+  const sample = lines.slice(0, 80).join("\n");
+  if (/kaspi\s*gold|выписка\s+по\s+kaspi|«kaspi bank»|ao\s*«?kaspi/i.test(sample)) {
+    return true;
+  }
+  let hits = 0;
+  for (const line of lines.slice(0, 120)) {
+    if (KASPI_GOLD_LINE.test(line.replace(/\u00a0/g, " ").trim())) {
+      hits += 1;
+      if (hits >= 3) return true;
+    }
+  }
+  return false;
 }
 
 function applyTitleSignHints(title: string, amountMinor: number, amountRaw: string): number {
@@ -393,6 +431,82 @@ function applyTitleSignHints(title: string, amountMinor: number, amountRaw: stri
   return -Math.abs(amountMinor);
 }
 
+/** Парсер выписки Kaspi Gold (приложение к справке). */
+export function parseKaspiGoldStatementLines(
+  lines: string[],
+  input: { currency: string },
+): StatementParseResult {
+  if (lines.length === 0) {
+    throw new Error("В PDF нет текста — возможно, это скан без распознавания");
+  }
+
+  const rows: ParsedStatementRow[] = [];
+  const issues: StatementParseIssue[] = [];
+  let skipped = 0;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const lineNumber = i + 1;
+    const line = lines[i]!.replace(/\u00a0/g, " ").trim();
+    if (!line || KASPI_FX_NOTE.test(line) || NOISE_LINE.test(line)) {
+      continue;
+    }
+
+    const match = KASPI_GOLD_LINE.exec(line);
+    if (!match) {
+      continue;
+    }
+
+    try {
+      const occurredAt = parseStatementDate(match[1]!);
+      const sign = match[2]!;
+      const amountMinor = parseMoneyToMinor(`${sign}${match[3]!}`, input.currency);
+      const title = match[4]!.replace(/\s+/g, " ").trim().slice(0, 120);
+
+      if (amountMinor === 0) {
+        skipped += 1;
+        continue;
+      }
+      if (!title) {
+        throw new Error("Пустое описание операции");
+      }
+
+      rows.push({
+        lineNumber,
+        occurredAt,
+        title,
+        amountMinor,
+        kind: amountMinor < 0 ? "expense" : "income",
+      });
+
+      if (rows.length > MAX_STATEMENT_ROWS) {
+        throw new Error(`Слишком много операций (максимум ${MAX_STATEMENT_ROWS})`);
+      }
+    } catch (err: unknown) {
+      issues.push({
+        lineNumber,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (rows.length === 0) {
+    throw new Error(
+      issues[0]
+        ? `Не удалось прочитать операции Kaspi. Пример: строка ${issues[0].lineNumber} — ${issues[0].message}`
+        : "Не найдено операций Kaspi Gold. Нужна выписка с текстовым слоем.",
+    );
+  }
+
+  return {
+    source: "pdf",
+    headers: ["дата", "сумма", "операция"],
+    presetId: "kaspi",
+    rows,
+    issues,
+    skipped,
+  };
+}
+
 /** Разбор текстовых строк выписки (после извлечения из PDF). */
 export function parsePdfStatementLines(
   lines: string[],
@@ -412,6 +526,10 @@ export function parsePdfStatementLines(
     input.presetId && input.presetId !== "auto"
       ? input.presetId
       : inferPdfBank(lines);
+
+  if (presetId === "kaspi" || looksLikeKaspiGold(lines)) {
+    return parseKaspiGoldStatementLines(lines, input);
+  }
 
   const rows: ParsedStatementRow[] = [];
   const issues: StatementParseIssue[] = [];

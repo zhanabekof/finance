@@ -109,6 +109,7 @@ export type GoalContribution = {
   note: string | null;
   contributed_at: string;
   created_at: string;
+  transaction_id?: number | null;
 };
 
 export type GoalSummary = Goal & {
@@ -1026,28 +1027,39 @@ export async function copyYearBudgetToNextYear(fromYear: string): Promise<string
     throw new Error("Исходный годовой бюджет не найден");
   }
 
-  const existing = await db.select<YearBudget[]>(
-    "SELECT id FROM year_budgets WHERE year = $1",
-    [target],
-  );
-  if (existing[0]) {
-    throw new Error(`Бюджет на ${target} уже существует`);
-  }
-
   const stamp = nowIso();
-  await db.execute(
-    `INSERT INTO year_budgets (year, currency, planned_income_minor, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [target, source.currency, source.planned_income_minor, stamp, stamp],
-  );
-
-  const created = await db.select<YearBudget[]>(
-    "SELECT id FROM year_budgets WHERE year = $1",
+  const existing = await db.select<YearBudget[]>(
+    "SELECT id, year, currency, planned_income_minor, created_at, updated_at FROM year_budgets WHERE year = $1",
     [target],
   );
-  const newBudget = created[0];
-  if (!newBudget) {
-    throw new Error("Не удалось скопировать годовой бюджет");
+
+  let targetBudgetId: number;
+  if (existing[0]) {
+    targetBudgetId = existing[0].id;
+    await db.execute(
+      `UPDATE year_budgets
+       SET currency = $1, planned_income_minor = $2, updated_at = $3
+       WHERE id = $4`,
+      [source.currency, source.planned_income_minor, stamp, targetBudgetId],
+    );
+    await db.execute("DELETE FROM year_budget_limits WHERE year_budget_id = $1", [
+      targetBudgetId,
+    ]);
+  } else {
+    await db.execute(
+      `INSERT INTO year_budgets (year, currency, planned_income_minor, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [target, source.currency, source.planned_income_minor, stamp, stamp],
+    );
+    const created = await db.select<YearBudget[]>(
+      "SELECT id FROM year_budgets WHERE year = $1",
+      [target],
+    );
+    const newBudget = created[0];
+    if (!newBudget) {
+      throw new Error("Не удалось скопировать годовой бюджет");
+    }
+    targetBudgetId = newBudget.id;
   }
 
   const limits = await listYearBudgetLimits(source.id);
@@ -1055,7 +1067,7 @@ export async function copyYearBudgetToNextYear(fromYear: string): Promise<string
     await db.execute(
       `INSERT INTO year_budget_limits (year_budget_id, category_id, limit_minor)
        VALUES ($1, $2, $3)`,
-      [newBudget.id, limit.category_id, limit.limit_minor],
+      [targetBudgetId, limit.category_id, limit.limit_minor],
     );
   }
 
@@ -1131,28 +1143,37 @@ export async function copyBudgetToNextMonth(fromYearMonth: string): Promise<stri
     throw new Error("Исходный бюджет не найден");
   }
 
-  const existing = await db.select<Budget[]>(
-    "SELECT id FROM budgets WHERE year_month = $1",
-    [target],
-  );
-  if (existing[0]) {
-    throw new Error(`Бюджет на ${target} уже существует`);
-  }
-
   const stamp = nowIso();
-  await db.execute(
-    `INSERT INTO budgets (year_month, currency, planned_income_minor, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [target, source.currency, source.planned_income_minor, stamp, stamp],
-  );
-
-  const created = await db.select<Budget[]>(
-    "SELECT id FROM budgets WHERE year_month = $1",
+  const existing = await db.select<Budget[]>(
+    "SELECT id, year_month, currency, planned_income_minor, created_at, updated_at FROM budgets WHERE year_month = $1",
     [target],
   );
-  const newBudget = created[0];
-  if (!newBudget) {
-    throw new Error("Не удалось скопировать бюджет");
+
+  let targetBudgetId: number;
+  if (existing[0]) {
+    targetBudgetId = existing[0].id;
+    await db.execute(
+      `UPDATE budgets
+       SET currency = $1, planned_income_minor = $2, updated_at = $3
+       WHERE id = $4`,
+      [source.currency, source.planned_income_minor, stamp, targetBudgetId],
+    );
+    await db.execute("DELETE FROM budget_limits WHERE budget_id = $1", [targetBudgetId]);
+  } else {
+    await db.execute(
+      `INSERT INTO budgets (year_month, currency, planned_income_minor, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [target, source.currency, source.planned_income_minor, stamp, stamp],
+    );
+    const created = await db.select<Budget[]>(
+      "SELECT id FROM budgets WHERE year_month = $1",
+      [target],
+    );
+    const newBudget = created[0];
+    if (!newBudget) {
+      throw new Error("Не удалось скопировать бюджет");
+    }
+    targetBudgetId = newBudget.id;
   }
 
   const limits = await listBudgetLimits(source.id);
@@ -1160,7 +1181,7 @@ export async function copyBudgetToNextMonth(fromYearMonth: string): Promise<stri
     await db.execute(
       `INSERT INTO budget_limits (budget_id, category_id, limit_minor)
        VALUES ($1, $2, $3)`,
-      [newBudget.id, limit.category_id, limit.limit_minor],
+      [targetBudgetId, limit.category_id, limit.limit_minor],
     );
   }
 
@@ -1496,7 +1517,7 @@ export async function archiveGoal(id: number): Promise<void> {
 export async function listGoalContributions(goalId: number): Promise<GoalContribution[]> {
   const db = await getDb();
   return db.select<GoalContribution[]>(
-    `SELECT id, goal_id, amount_minor, note, contributed_at, created_at
+    `SELECT id, goal_id, amount_minor, note, contributed_at, created_at, transaction_id
      FROM goal_contributions
      WHERE goal_id = $1
      ORDER BY contributed_at DESC, id DESC`,
@@ -1504,10 +1525,36 @@ export async function listGoalContributions(goalId: number): Promise<GoalContrib
   );
 }
 
+async function ensureGoalSavingsCategoryId(): Promise<number> {
+  const db = await getDb();
+  const existing = await db.select<Category[]>(
+    `SELECT id, name, kind, is_essential, archived
+     FROM categories
+     WHERE kind = 'expense' AND archived = 0 AND name = 'Накопления'
+     ORDER BY id ASC
+     LIMIT 1`,
+  );
+  if (existing[0]) {
+    return existing[0].id;
+  }
+
+  const result = await db.execute(
+    `INSERT INTO categories (name, kind, is_essential, archived)
+     VALUES ('Накопления', 'expense', 0, 0)`,
+  );
+  const id = result.lastInsertId;
+  if (id == null) {
+    throw new Error("Не удалось создать категорию «Накопления»");
+  }
+  return Number(id);
+}
+
 export async function addGoalContribution(input: {
   goalId: number;
+  accountId: number;
   amountInput: string;
   note?: string;
+  categoryId?: number;
 }): Promise<void> {
   const db = await getDb();
   const existing = await db.select<Goal[]>(
@@ -1519,19 +1566,78 @@ export async function addGoalContribution(input: {
     throw new Error("Цель не найдена");
   }
 
+  const accounts = await db.select<Account[]>(
+    "SELECT id, name, currency, archived, created_at FROM accounts WHERE id = $1 AND archived = 0",
+    [input.accountId],
+  );
+  const account = accounts[0];
+  if (!account) {
+    throw new Error("Счёт не найден");
+  }
+  if (account.currency !== goal.currency) {
+    throw new Error("Валюта счёта должна совпадать с валютой цели");
+  }
+
   const amountMinor = Math.abs(parseMoneyInput(input.amountInput, goal.currency));
   if (amountMinor <= 0) {
     throw new Error("Сумма пополнения должна быть больше нуля");
   }
 
-  const note = (input.note ?? "").trim() || null;
-  const stamp = nowIso();
-  await db.execute(
-    `INSERT INTO goal_contributions (goal_id, amount_minor, note, contributed_at, created_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [input.goalId, amountMinor, note, stamp, stamp],
+  const categoryId = input.categoryId ?? (await ensureGoalSavingsCategoryId());
+  const categories = await db.select<Category[]>(
+    "SELECT id, name, kind, is_essential, archived FROM categories WHERE id = $1 AND archived = 0",
+    [categoryId],
   );
-  await db.execute("UPDATE goals SET updated_at = $1 WHERE id = $2", [stamp, input.goalId]);
+  const category = categories[0];
+  if (!category) {
+    throw new Error("Категория не найдена");
+  }
+  if (category.kind !== "expense") {
+    throw new Error("Для пополнения цели нужна категория расхода");
+  }
+
+  const note = (input.note ?? "").trim() || null;
+  const title = note || `Цель: ${goal.title}`;
+  const stamp = nowIso();
+  let transactionId: number | null = null;
+
+  try {
+    const txResult = await db.execute(
+      `INSERT INTO transactions
+        (account_id, category_id, title, amount_minor, currency, occurred_at, transfer_group_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NULL, $7)`,
+      [
+        account.id,
+        categoryId,
+        title.slice(0, 120),
+        -amountMinor,
+        goal.currency,
+        stamp,
+        stamp,
+      ],
+    );
+    transactionId =
+      txResult.lastInsertId == null ? null : Number(txResult.lastInsertId);
+    if (transactionId == null) {
+      throw new Error("Не удалось создать операцию");
+    }
+
+    await db.execute(
+      `INSERT INTO goal_contributions
+        (goal_id, amount_minor, note, contributed_at, created_at, transaction_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [input.goalId, amountMinor, note, stamp, stamp, transactionId],
+    );
+    await db.execute("UPDATE goals SET updated_at = $1 WHERE id = $2", [
+      stamp,
+      input.goalId,
+    ]);
+  } catch (error) {
+    if (transactionId != null) {
+      await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+    }
+    throw error;
+  }
 }
 
 function normalizeDeadline(value?: string | null): string | null {
