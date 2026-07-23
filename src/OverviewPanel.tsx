@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { AnalyticsOverview } from "./analytics";
 import { formatPercent } from "./analytics";
 import { formatMoney } from "./money";
+import { MonthSwitcher } from "./MonthSwitcher";
 
 const MONTH_LABELS = [
   "Янв",
@@ -34,16 +35,6 @@ function formatDate(iso: string): string {
     day: "2-digit",
     month: "short",
   }).format(date);
-}
-
-function shiftMonth(yearMonth: string, delta: number): string {
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth)) {
-    const now = new Date();
-    yearMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  }
-  const [year, month] = yearMonth.split("-").map(Number);
-  const date = new Date(Date.UTC(year, (month ?? 1) - 1 + delta, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function monthTitle(yearMonth: string): string {
@@ -103,49 +94,11 @@ export function OverviewPanel({
           <h2>{monthTitle(analytics.yearMonth)}</h2>
           <p className="muted">Главное о деньгах за выбранный месяц</p>
         </div>
-        <div className="period-nav" aria-label="Период аналитики">
-          <button
-            type="button"
-            className="ghost period-arrow"
-            aria-label="Предыдущий месяц"
-            onClick={() => onYearMonthChange(shiftMonth(analytics.yearMonth, -1))}
-          >
-            ←
-          </button>
-          <label className="period-picker">
-            <span className="visually-hidden">Выбрать месяц</span>
-            <input
-              type="month"
-              value={analytics.yearMonth}
-              onChange={(e) => {
-                const value = e.currentTarget.value;
-                if (/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
-                  onYearMonthChange(value);
-                }
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="ghost period-arrow"
-            aria-label="Следующий месяц"
-            onClick={() => onYearMonthChange(shiftMonth(analytics.yearMonth, 1))}
-          >
-            →
-          </button>
-          <button
-            type="button"
-            className="ghost period-today"
-            onClick={() => {
-              const now = new Date();
-              onYearMonthChange(
-                `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`,
-              );
-            }}
-          >
-            Сейчас
-          </button>
-        </div>
+        <MonthSwitcher
+          value={analytics.yearMonth}
+          onChange={onYearMonthChange}
+          ariaLabel="Период аналитики"
+        />
       </header>
 
       <section className="financial-pulse" aria-label="Состояние финансов">

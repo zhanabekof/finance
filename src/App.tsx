@@ -36,9 +36,18 @@ import { OverviewPanel } from "./OverviewPanel";
 import { CategoriesPanel } from "./CategoriesPanel";
 import { GoalsPanel } from "./GoalsPanel";
 import { ImportPanel } from "./ImportPanel";
+import { CurrencyConverterPanel } from "./CurrencyConverterPanel";
+import { MonthSwitcher } from "./MonthSwitcher";
 import "./App.css";
 
-type Tab = "overview" | "transactions" | "budget" | "goals" | "import" | "categories";
+type Tab =
+  | "overview"
+  | "transactions"
+  | "budget"
+  | "goals"
+  | "converter"
+  | "import"
+  | "categories";
 type BudgetScope = "month" | "year";
 
 const NAV_ITEMS: Array<{ id: Tab; label: string }> = [
@@ -46,6 +55,7 @@ const NAV_ITEMS: Array<{ id: Tab; label: string }> = [
   { id: "transactions", label: "Операции" },
   { id: "budget", label: "Бюджет" },
   { id: "goals", label: "Цели" },
+  { id: "converter", label: "Конвертер" },
   { id: "import", label: "Импорт" },
   { id: "categories", label: "Категории" },
 ];
@@ -848,38 +858,52 @@ function App() {
             </header>
 
             <div className="budget-toolbar">
-              <div className="kind-toggle" role="group" aria-label="Период бюджета">
-                <button
-                  type="button"
-                  className={budgetScope === "month" ? "active" : ""}
-                  onClick={() => {
-                    budgetDraftsDirtyRef.current = false;
-                    setBudgetScope("month");
-                  }}
-                >
-                  Месяц
-                </button>
-                <button
-                  type="button"
-                  className={budgetScope === "year" ? "active" : ""}
-                  onClick={() => {
-                    budgetDraftsDirtyRef.current = false;
-                    setBudgetScope("year");
-                  }}
-                >
-                  Год
-                </button>
+              <div className="budget-toolbar-top">
+                <div className="kind-toggle" role="group" aria-label="Период бюджета">
+                  <button
+                    type="button"
+                    className={budgetScope === "month" ? "active" : ""}
+                    onClick={() => {
+                      budgetDraftsDirtyRef.current = false;
+                      setBudgetScope("month");
+                    }}
+                  >
+                    Месяц
+                  </button>
+                  <button
+                    type="button"
+                    className={budgetScope === "year" ? "active" : ""}
+                    onClick={() => {
+                      budgetDraftsDirtyRef.current = false;
+                      setBudgetScope("year");
+                    }}
+                  >
+                    Год
+                  </button>
+                </div>
+
+                <div className="budget-toolbar-actions">
+                  <button type="button" className="ghost" onClick={onCopyBudget}>
+                    {budgetScope === "month" ? "На следующий месяц" : "На следующий год"}
+                  </button>
+                  {budgetScope === "year" && (
+                    <button type="button" className="ghost" onClick={onApplyYearToMonths}>
+                      Разложить на 12 месяцев
+                    </button>
+                  )}
+                </div>
               </div>
 
               {budgetScope === "month" ? (
-                <label className="budget-period-field">
+                <div className="budget-period-field budget-period-switcher">
                   <span>Месяц</span>
-                  <input
-                    type="month"
+                  <MonthSwitcher
                     value={isYearMonth(yearMonth) ? yearMonth : currentYearMonth()}
-                    onChange={(e) => commitYearMonth(e.currentTarget.value)}
+                    onChange={commitYearMonth}
+                    showToday={false}
+                    ariaLabel="Месяц бюджета"
                   />
-                </label>
+                </div>
               ) : (
                 <label className="budget-period-field">
                   <span>Год</span>
@@ -893,17 +917,6 @@ function App() {
                   />
                 </label>
               )}
-
-              <div className="budget-toolbar-actions">
-                <button type="button" className="ghost" onClick={onCopyBudget}>
-                  {budgetScope === "month" ? "На следующий месяц" : "На следующий год"}
-                </button>
-                {budgetScope === "year" && (
-                  <button type="button" className="ghost" onClick={onApplyYearToMonths}>
-                    Разложить на 12 месяцев
-                  </button>
-                )}
-              </div>
             </div>
 
             {budgetScope === "year" && yearBudgetSummary && (
@@ -1194,6 +1207,10 @@ function App() {
               await refresh();
             }}
           />
+        )}
+
+        {tab === "converter" && (
+          <CurrencyConverterPanel defaultCurrency={primaryCurrency} />
         )}
 
         {tab === "import" && (

@@ -18,7 +18,7 @@ import {
   NEAR_LIMIT_RATIO,
 } from "./budget";
 import { buildGoalProgress, suggestedMonthlyContribution } from "./goals";
-import { formatMoney, parseMoneyInput, sumMinor } from "./money";
+import { formatMoney, formatMinorPlain, parseMoneyInput, sumMinor } from "./money";
 import {
   assertStatementFileLimits,
   MAX_STATEMENT_BYTES,
@@ -44,6 +44,12 @@ describe("money", () => {
   it("formats minor units with currency", () => {
     expect(formatMoney(150050, "KZT")).toContain("1");
     expect(formatMoney(-4210, "KZT")).toContain("42");
+  });
+
+  it("formats plain major amounts for converter inputs", () => {
+    expect(formatMinorPlain(150050, "KZT")).toBe("1500.50");
+    expect(formatMinorPlain(150, "JPY")).toBe("150");
+    expect(formatMinorPlain(-4210, "USD")).toBe("-42.10");
   });
 
   it("sums large and zero values safely", () => {

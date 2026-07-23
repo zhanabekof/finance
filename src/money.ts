@@ -3,6 +3,13 @@ const FRACTION_DIGITS: Record<string, number> = {
   KZT: 2,
   USD: 2,
   EUR: 2,
+  RUB: 2,
+  GBP: 2,
+  CNY: 2,
+  TRY: 2,
+  AED: 2,
+  CHF: 2,
+  JPY: 0,
 };
 
 export function currencyFractionDigits(currency: string): number {
@@ -73,19 +80,25 @@ export function parseMoneyInputOrZero(input: string, currency: string): number {
   return parseMoneyInput(trimmed, currency);
 }
 
-export function formatMoney(amountMinor: number, currency: string, locale = "ru-RU"): string {
+/** Plain major-unit string for inputs (dot decimal, fixed fraction digits). */
+export function formatMinorPlain(amountMinor: number, currency: string): string {
   const digits = currencyFractionDigits(currency);
   const scale = scaleForCurrency(currency);
   const absolute = Math.abs(amountMinor);
   const whole = Math.trunc(absolute / scale);
   const fraction = absolute % scale;
   const sign = amountMinor < 0 ? "-" : "";
-  const major =
-    digits === 0
-      ? String(whole)
-      : `${whole}.${String(fraction).padStart(digits, "0")}`;
+  if (digits === 0) {
+    return `${sign}${whole}`;
+  }
+  return `${sign}${whole}.${String(fraction).padStart(digits, "0")}`;
+}
 
-  const asNumber = Number(`${sign}${major}`);
+export function formatMoney(amountMinor: number, currency: string, locale = "ru-RU"): string {
+  const digits = currencyFractionDigits(currency);
+  const major = formatMinorPlain(amountMinor, currency);
+  const asNumber = Number(major);
+
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency.toUpperCase(),
