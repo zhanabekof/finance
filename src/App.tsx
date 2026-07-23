@@ -23,21 +23,21 @@ import {
   type Account,
   type Category,
   type Transaction,
-} from "./db";
+} from "./lib/db";
 import {
   currentYear,
   currentYearMonth,
   type MonthBudgetSummary,
   type YearBudgetSummary,
-} from "./budget";
-import type { AnalyticsOverview } from "./analytics";
-import { formatMoney, parseMoneyInputOrZero, sumMinor } from "./money";
-import { OverviewPanel } from "./OverviewPanel";
-import { CategoriesPanel } from "./CategoriesPanel";
-import { GoalsPanel } from "./GoalsPanel";
-import { ImportPanel } from "./ImportPanel";
-import { CurrencyConverterPanel } from "./CurrencyConverterPanel";
-import { MonthSwitcher } from "./MonthSwitcher";
+} from "./lib/budget";
+import type { AnalyticsOverview } from "./lib/analytics";
+import { formatMoney, parseMoneyInputOrZero, sumMinor } from "./lib/money";
+import { OverviewPanel } from "./components/OverviewPanel";
+import { CategoriesPanel } from "./components/CategoriesPanel";
+import { GoalsPanel } from "./components/GoalsPanel";
+import { ImportPanel } from "./components/ImportPanel";
+import { CurrencyConverterPanel } from "./components/CurrencyConverterPanel";
+import { MonthSwitcher } from "./components/MonthSwitcher";
 import "./App.css";
 
 type Tab =

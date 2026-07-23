@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useRef, useState } from "react";
-import type { Category } from "./db";
+import type { Category } from "../lib/db";
 
 type Props = {
   categories: Category[];

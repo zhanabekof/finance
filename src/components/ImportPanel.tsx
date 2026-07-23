@@ -3,8 +3,8 @@ import {
   importTransactions,
   type Account,
   type Category,
-} from "./db";
-import { formatMoney } from "./money";
+} from "../lib/db";
+import { formatMoney } from "../lib/money";
 import {
   listStatementPresets,
   MAX_STATEMENT_BYTES,
@@ -12,7 +12,7 @@ import {
   type ParsedStatementRow,
   type StatementBankPresetId,
   type StatementParseResult,
-} from "./statementImport";
+} from "../lib/statementImport";
 
 type Props = {
   accounts: Account[];

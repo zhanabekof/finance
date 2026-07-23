@@ -6,8 +6,8 @@ import {
   loadFxRates,
   rateFromTo,
   type FxRateSnapshot,
-} from "./currencyConvert";
-import { formatMinorPlain, parseMoneyInput } from "./money";
+} from "../lib/currencyConvert";
+import { formatMinorPlain, parseMoneyInput } from "../lib/money";
 
 type Props = {
   defaultCurrency?: string;

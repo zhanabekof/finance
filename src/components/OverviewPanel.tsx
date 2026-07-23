@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
-import type { AnalyticsOverview } from "./analytics";
-import { formatPercent } from "./analytics";
-import { formatMoney } from "./money";
+import type { AnalyticsOverview } from "../lib/analytics";
+import { formatPercent } from "../lib/analytics";
+import { formatMoney } from "../lib/money";
 import { MonthSwitcher } from "./MonthSwitcher";
 
 const MONTH_LABELS = [

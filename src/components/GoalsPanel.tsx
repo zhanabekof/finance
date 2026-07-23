@@ -9,13 +9,13 @@ import {
   type Account,
   type GoalContribution,
   type GoalSummary,
-} from "./db";
+} from "../lib/db";
 import {
   buildGoalProgress,
   suggestedMonthlyContribution,
   type GoalProgress,
-} from "./goals";
-import { formatMoney } from "./money";
+} from "../lib/goals";
+import { formatMoney } from "../lib/money";
 
 type Props = {
   currency: string;
