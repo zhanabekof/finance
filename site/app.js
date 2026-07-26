@@ -18,6 +18,21 @@ function formatDate(iso) {
   }).format(date);
 }
 
+function detectPreferredPlatform() {
+  const ua = navigator.userAgent.toLowerCase();
+  const platform = (navigator.platform || "").toLowerCase();
+  if (platform.includes("mac") || ua.includes("mac os")) {
+    return ua.includes("arm") || ua.includes("aarch64") ? "mac-arm" : "mac-intel";
+  }
+  if (platform.includes("win") || ua.includes("windows")) {
+    return "win-msi";
+  }
+  if (platform.includes("linux") || ua.includes("linux")) {
+    return "linux-appimage";
+  }
+  return null;
+}
+
 function render(catalog) {
   if (catalog.htmlUrl) {
     allReleases.href = catalog.htmlUrl;
@@ -32,23 +47,30 @@ function render(catalog) {
 
   const when = formatDate(catalog.publishedAt);
   versionLine.textContent = when
-    ? `${catalog.tag} · опубликован ${when}`
-    : catalog.tag;
+    ? `Актуальная версия ${catalog.tag} · ${when}`
+    : `Актуальная версия ${catalog.tag}`;
 
   empty.hidden = true;
+  const preferred = detectPreferredPlatform();
   const fragment = document.createDocumentFragment();
+
   for (const asset of catalog.assets) {
     const card = document.createElement("a");
     card.className = "download-card";
     card.href = asset.url;
     card.rel = "noopener";
     card.setAttribute("role", "listitem");
+    if (preferred && asset.id === preferred) {
+      card.dataset.preferred = "true";
+      card.style.borderColor = "color-mix(in srgb, var(--teal) 55%, var(--line))";
+    }
     card.innerHTML = `
       <span class="platform">${asset.label}</span>
       <span class="subtitle">${asset.subtitle}</span>
       <span class="meta">
         <b>${asset.kind}</b>
         ${asset.sizeLabel ? `<span>${asset.sizeLabel}</span>` : ""}
+        ${preferred && asset.id === preferred ? "<span>для этого устройства</span>" : ""}
       </span>
     `;
     fragment.appendChild(card);
@@ -66,6 +88,6 @@ try {
   versionLine.textContent = "Не удалось загрузить список сборок";
   empty.hidden = false;
   empty.textContent =
-    "Откройте страницу релизов на GitHub или обновите сайт после следующей сборки.";
+    "Откройте релизы на GitHub или обновите страницу после следующей сборки Pages.";
   console.error(error);
 }

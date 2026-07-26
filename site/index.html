@@ -5,67 +5,237 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Finance — локальное приложение для личных финансов. Скачайте сборку для macOS, Windows или Linux."
+      content="Finance — локальное desktop-приложение для личных финансов: операции, бюджет, цели и отчёты. Без аккаунта и без облака."
     />
-    <title>Finance — скачать</title>
+    <meta name="theme-color" content="#0f1c2e" />
+    <title>Finance — личные финансы на своём компьютере</title>
+    <link rel="icon" href="./icon.png" type="image/png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="atmosphere" aria-hidden="true"></div>
-    <main class="page">
-      <header class="hero">
-        <p class="eyebrow">Локально · без облака</p>
-        <h1>Finance</h1>
-        <p class="lede">
-          Личные финансы на вашем компьютере: операции, бюджет, цели и отчёты.
-          Данные остаются у вас.
-        </p>
-        <p id="version-line" class="version muted">Загружаю список сборок…</p>
-      </header>
+    <a class="skip" href="#download">К скачиванию</a>
 
-      <section class="downloads" aria-labelledby="downloads-title">
-        <div class="section-head">
-          <h2 id="downloads-title">Скачать</h2>
-          <a id="all-releases" class="ghost-link" href="https://github.com/zhanabekof/finance/releases">
-            Все релизы
+    <header class="topbar">
+      <a class="brand-mark" href="#top" aria-label="Finance — наверх">
+        <img src="./icon.png" width="28" height="28" alt="" />
+        <span>Finance</span>
+      </a>
+      <nav class="topnav" aria-label="Разделы">
+        <a href="#local">Приватность</a>
+        <a href="#features">Возможности</a>
+        <a href="#trust">Точность</a>
+        <a class="topnav-cta" href="#download">Скачать</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-label="Finance">
+        <div class="hero-copy">
+          <p class="eyebrow">Desktop · SQLite · без аккаунта</p>
+          <h1>Finance</h1>
+          <p class="lede">
+            Личный бюджет и история денег на вашем компьютере — без облака и без
+            чужих серверов.
+          </p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#download">Скачать приложение</a>
+            <a class="btn ghost" href="#features">Что умеет</a>
+          </div>
+        </div>
+
+        <div class="hero-stage" aria-hidden="true">
+          <div class="stage-glow"></div>
+          <figure class="app-frame">
+            <div class="app-chrome">
+              <span></span><span></span><span></span>
+              <em>Обзор · июль 2026</em>
+            </div>
+            <div class="app-body">
+              <div class="pulse">
+                <span>Общий баланс</span>
+                <strong class="mono">1&nbsp;284&nbsp;500 ₸</strong>
+                <p>За месяц осталось <b class="income">+186&nbsp;200 ₸</b></p>
+              </div>
+              <div class="ribbon" role="presentation">
+                <i style="--h: 42%"><b class="inc"></b><b class="exp" style="--eh: 70%"></b></i>
+                <i style="--h: 55%"><b class="inc"></b><b class="exp" style="--eh: 48%"></b></i>
+                <i style="--h: 38%"><b class="inc"></b><b class="exp" style="--eh: 82%"></b></i>
+                <i class="now" style="--h: 68%"><b class="inc"></b><b class="exp" style="--eh: 44%"></b></i>
+                <i style="--h: 50%"><b class="inc"></b><b class="exp" style="--eh: 36%"></b></i>
+                <i style="--h: 60%"><b class="inc"></b><b class="exp" style="--eh: 58%"></b></i>
+              </div>
+              <ul class="mini-ledger">
+                <li><span>Продукты</span><em class="expense">−24&nbsp;800</em></li>
+                <li><span>Зарплата</span><em class="income">+420&nbsp;000</em></li>
+                <li><span>Перевод → Накопления</span><em>⇄ 50&nbsp;000</em></li>
+              </ul>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <section id="local" class="band local">
+        <div class="band-inner">
+          <p class="eyebrow">Почему так</p>
+          <h2>Деньги — это история. Её не нужно отдавать в облако.</h2>
+          <p class="band-text">
+            Finance рассчитан на одного человека и один локальный профиль.
+            Операции, бюджеты и цели живут в SQLite на устройстве. Нет
+            регистрации, семейных аккаунтов и синхронизации «куда-то ещё».
+          </p>
+          <ul class="pillars">
+            <li>
+              <strong>Приватно</strong>
+              <span>Суммы и названия операций не уходят на чужие серверы.</span>
+            </li>
+            <li>
+              <strong>Целостно</strong>
+              <span>Балансы считаются из операций, а не из дублирующих полей.</span>
+            </li>
+            <li>
+              <strong>Восстановимо</strong>
+              <span>Явный JSON-бэкап и восстановление — только по вашей кнопке.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="features" class="features">
+        <div class="section-intro">
+          <p class="eyebrow">Возможности</p>
+          <h2>Всё нужное для личного бюджета — без лишнего продукта.</h2>
+        </div>
+
+        <article class="feature">
+          <div class="feature-copy">
+            <h3>Обзор месяца</h3>
+            <p>
+              Баланс, денежный поток, план/факт и подсказки «сколько можно
+              тратить в день». Прогноз учитывает обязательные категории, не
+              создавая операции заранее.
+            </p>
+          </div>
+          <div class="feature-visual gauge" aria-hidden="true">
+            <div class="ring"><span>74%</span></div>
+            <p>лимит месяца · продукты и транспорт в норме</p>
+          </div>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-copy">
+            <h3>Операции, счета и переводы</h3>
+            <p>
+              Доход, расход или перевод между счетами. Можно поставить прошлую
+              дату и поправить запись. Архив счёта скрывает его из списков, но
+              не стирает историю.
+            </p>
+          </div>
+          <div class="feature-visual kinds" aria-hidden="true">
+            <span class="k expense">− Расход</span>
+            <span class="k income">+ Доход</span>
+            <span class="k transfer">⇄ Перевод</span>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature-copy">
+            <h3>Бюджет на месяц и на год</h3>
+            <p>
+              Плановый доход, лимиты по категориям, свободные средства и
+              копирование плана. Перерасход предупреждает — и не блокирует
+              жизнь, если нужно потратить больше.
+            </p>
+          </div>
+          <div class="feature-visual bars" aria-hidden="true">
+            <div><label>Продукты</label><i style="--w: 86%"></i></div>
+            <div><label>Транспорт</label><i style="--w: 54%"></i></div>
+            <div class="over"><label>Кафе</label><i style="--w: 112%"></i></div>
+          </div>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-copy">
+            <h3>Цели, импорт и отчёт</h3>
+            <p>
+              Накопления с пополнениями в операциях. Импорт PDF-выписок.
+              PDF-отчёт «как от консультанта» — с пояснениями и шагами на
+              ближайшие недели.
+            </p>
+          </div>
+          <div class="feature-visual report" aria-hidden="true">
+            <span class="report-tag">Локальный отчёт</span>
+            <strong>Устойчивый темп</strong>
+            <p>Норма сбережений 37% — комфортный запас между доходом и расходами.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="trust" class="band trust">
+        <div class="band-inner">
+          <p class="eyebrow">Точность</p>
+          <h2>Деньги считаются в тиынах и центах, не в «примерных» дробях.</h2>
+          <p class="band-text">
+            Суммы хранятся целыми числами в минимальных единицах валюты.
+            Разные валюты не складываются без явного курса. Даты — в UTC, на
+            экране — по-человечески.
+          </p>
+          <p class="mono sample">1500.50 KZT → 150&nbsp;050 тиын</p>
+        </div>
+      </section>
+
+      <section id="download" class="download">
+        <div class="download-head">
+          <div>
+            <p class="eyebrow">Установка</p>
+            <h2>Скачать Finance</h2>
+            <p id="version-line" class="muted">Загружаю список сборок…</p>
+          </div>
+          <a
+            id="all-releases"
+            class="ghost-link"
+            href="https://github.com/zhanabekof/finance/releases"
+          >
+            Все релизы на GitHub
           </a>
         </div>
+
         <div id="download-grid" class="download-grid" role="list"></div>
         <p id="download-empty" class="empty muted" hidden>
-          Пока нет опубликованных сборок. Загляните на страницу релизов или
-          подождите окончания GitHub Actions.
+          Пока нет опубликованных сборок. Откройте релизы на GitHub или
+          дождитесь окончания сборки.
         </p>
-      </section>
 
-      <section class="notes" aria-label="Важно">
-        <article>
-          <h3>Перед обновлением</h3>
+        <div class="install-notes">
           <p>
-            Сделайте бэкап во вкладке «Данные» внутри приложения — так история
-            операций не потеряется при переустановке.
+            <strong>Перед обновлением</strong> сделайте бэкап во вкладке
+            «Данные» внутри приложения.
           </p>
-        </article>
-        <article>
-          <h3>macOS и Windows</h3>
           <p>
-            Сборки не подписаны магазином. При первом запуске система может
-            предупредить — это ожидаемо для личного распространения.
+            <strong>macOS / Windows:</strong> сборки не из App Store / Microsoft
+            Store — система может спросить подтверждение при первом запуске.
           </p>
-        </article>
+        </div>
       </section>
-
-      <footer class="foot">
-        <a href="https://github.com/zhanabekof/finance">Исходный код</a>
-        <span class="muted">·</span>
-        <span class="muted">Приватные финансы. Локальный SQLite.</span>
-      </footer>
     </main>
+
+    <footer class="site-foot">
+      <div>
+        <strong>Finance</strong>
+        <span class="muted">Приватные финансы. Локальный SQLite.</span>
+      </div>
+      <div class="foot-links">
+        <a href="https://github.com/zhanabekof/finance">Исходный код</a>
+        <a href="https://github.com/zhanabekof/finance/releases">Релизы</a>
+        <a href="#top">Наверх</a>
+      </div>
+    </footer>
+
     <script type="module" src="./app.js"></script>
   </body>
 </html>
