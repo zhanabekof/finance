@@ -12,6 +12,8 @@
   --income: #1f8f6a;
   --expense: #c45b3e;
   --shadow: 0 28px 80px rgba(15, 28, 46, 0.18);
+  --container: 1080px;
+  --gutter: clamp(1.25rem, 4vw, 2rem);
   color-scheme: light;
 }
 
@@ -33,6 +35,15 @@ body {
     radial-gradient(circle at 100% 8%, rgba(184, 92, 56, 0.08), transparent 28%),
     linear-gradient(180deg, var(--paper) 0%, var(--paper-deep) 100%);
   line-height: 1.5;
+}
+
+.container {
+  width: min(var(--container), calc(100% - (var(--gutter) * 2)));
+  margin-inline: auto;
+}
+
+.measure {
+  max-width: 40rem;
 }
 
 img {
@@ -90,14 +101,17 @@ a {
   position: sticky;
   top: 0;
   z-index: 20;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.topbar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem clamp(1rem, 4vw, 2rem);
-  backdrop-filter: blur(14px);
-  background: color-mix(in srgb, var(--paper) 82%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  padding-block: 0.85rem;
 }
 
 .brand-mark {
@@ -145,18 +159,20 @@ a {
 
 /* —— hero: one composition —— */
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: clamp(1.5rem, 5vw, 3.5rem);
-  align-items: center;
   min-height: calc(100dvh - 4.2rem);
-  padding: clamp(1.5rem, 5vw, 3.5rem) clamp(1rem, 4vw, 2rem)
-    clamp(2rem, 6vw, 4rem);
+  padding-block: clamp(1.5rem, 5vw, 3.5rem) clamp(2rem, 6vw, 4rem);
   background:
     radial-gradient(ellipse at 70% 40%, rgba(26, 155, 142, 0.18), transparent 55%),
     radial-gradient(ellipse at 100% 0%, rgba(184, 92, 56, 0.14), transparent 40%),
     linear-gradient(145deg, #0f1c2e 0%, #163047 55%, #0f1c2e 100%);
   color: var(--white);
+}
+
+.hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(1.5rem, 5vw, 3.5rem);
+  align-items: center;
 }
 
 .hero .eyebrow {
@@ -378,12 +394,7 @@ a {
 
 /* —— bands —— */
 .band {
-  padding: clamp(3rem, 8vw, 5.5rem) clamp(1rem, 4vw, 2rem);
-}
-
-.band-inner {
-  width: min(760px, 100%);
-  margin: 0 auto;
+  padding-block: clamp(3rem, 8vw, 5.5rem);
 }
 
 .band h2 {
@@ -454,9 +465,7 @@ a {
 
 /* —— features —— */
 .features {
-  width: min(980px, calc(100% - 2rem));
-  margin: 0 auto;
-  padding: clamp(3rem, 7vw, 5rem) 0;
+  padding-block: clamp(3rem, 7vw, 5rem);
 }
 
 .section-intro {
@@ -624,9 +633,7 @@ a {
 
 /* —— download —— */
 .download {
-  width: min(980px, calc(100% - 2rem));
-  margin: 0 auto;
-  padding: clamp(2.5rem, 7vw, 4.5rem) 0 clamp(3rem, 8vw, 5rem);
+  padding-block: clamp(2.5rem, 7vw, 4.5rem) clamp(3rem, 8vw, 5rem);
 }
 
 .download-head {
@@ -860,13 +867,16 @@ a {
 }
 
 .site-foot {
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--white) 55%, transparent);
+}
+
+.site-foot-inner {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.4rem clamp(1rem, 4vw, 2rem) 2rem;
-  border-top: 1px solid var(--line);
-  background: color-mix(in srgb, var(--white) 55%, transparent);
+  padding-block: 1.4rem 2rem;
 }
 
 .site-foot strong {
@@ -902,9 +912,12 @@ a {
 
 @media (max-width: 900px) {
   .hero {
-    grid-template-columns: 1fr;
     min-height: auto;
     padding-top: 2rem;
+  }
+
+  .hero-inner {
+    grid-template-columns: 1fr;
   }
 
   .app-frame {
