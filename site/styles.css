@@ -159,8 +159,7 @@ a {
 
 /* —— hero: one composition —— */
 .hero {
-  min-height: calc(100dvh - 4.2rem);
-  padding-block: clamp(1.5rem, 5vw, 3.5rem) clamp(2rem, 6vw, 4rem);
+  padding-block: clamp(2.25rem, 5vw, 3.25rem) clamp(2.5rem, 5vw, 3.75rem);
   background:
     radial-gradient(ellipse at 70% 40%, rgba(26, 155, 142, 0.18), transparent 55%),
     radial-gradient(ellipse at 100% 0%, rgba(184, 92, 56, 0.14), transparent 40%),
@@ -171,7 +170,7 @@ a {
 .hero-inner {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: clamp(1.5rem, 5vw, 3.5rem);
+  gap: clamp(1.5rem, 4vw, 2.75rem);
   align-items: center;
 }
 
@@ -182,10 +181,10 @@ a {
 .hero h1 {
   margin: 0;
   font-family: "Fraunces", Georgia, serif;
-  font-size: clamp(4rem, 12vw, 7rem);
+  font-size: clamp(3.4rem, 7vw, 5.25rem);
   font-weight: 700;
   letter-spacing: -0.04em;
-  line-height: 0.9;
+  line-height: 0.92;
 }
 
 .lede {
@@ -911,13 +910,12 @@ a {
 }
 
 @media (max-width: 900px) {
-  .hero {
-    min-height: auto;
-    padding-top: 2rem;
-  }
-
   .hero-inner {
     grid-template-columns: 1fr;
+  }
+
+  .hero h1 {
+    font-size: clamp(3.2rem, 14vw, 4.5rem);
   }
 
   .app-frame {
