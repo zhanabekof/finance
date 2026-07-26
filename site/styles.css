@@ -785,6 +785,17 @@ a {
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
+.download-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--teal) 40%, var(--line));
+  box-shadow: 0 22px 50px rgba(15, 28, 46, 0.1);
+}
+
+.download-card:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+
 .download-card .card-icon {
   grid-area: icon;
   display: grid;
@@ -824,6 +835,10 @@ a {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--mist);
+}
+
+.download-card .meta b {
+  color: var(--teal-deep);
 }
 
 .empty {
