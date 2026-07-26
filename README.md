@@ -74,6 +74,20 @@ git push origin v0.1.1
 
 Не создавайте пустой Release вручную до окончания Actions — дождитесь зелёного workflow **Release**, иначе получите релиз без файлов. Подписи Apple/Windows в CI пока нет.
 
+## Страница загрузок (GitHub Pages)
+
+Лендинг лежит в [`site/`](./site/) и деплоится workflow [`.github/workflows/pages.yml`](./.github/workflows/pages.yml).
+
+После каждого успешного **Release** (и при изменении `site/`) сайт обновляет `releases.json` со ссылками на актуальные `.dmg` / `.msi` / `.AppImage`.
+
+**Включение один раз**
+
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Запушьте `site/` на `main` или вручную: **Actions → Pages → Run workflow**.
+3. URL будет вида `https://zhanabekof.github.io/finance/`.
+
+Если репозиторий приватный, Pages доступны на платных планах GitHub; скачивание ассетов из private release тоже требует доступа к репо.
+
 ## Установка на iPhone
 
 1. Подключите телефон, доверьте компьютеру.
@@ -119,7 +133,8 @@ src-tauri/
 | `npm run build` | TypeScript + Vite production build |
 | `npm test` | Vitest |
 | `npm run tauri build` | установочный пакет desktop |
-| GitHub Actions `Release` | draft-релизы macOS / Windows / Linux по тегу `v*` |
+| GitHub Actions `Release` | релизы macOS / Windows / Linux по тегу `v*` |
+| GitHub Actions `Pages` | лендинг со ссылками на сборки |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | проверка Rust |
 
 ## Приватность

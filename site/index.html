@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Finance — локальное приложение для личных финансов. Скачайте сборку для macOS, Windows или Linux."
+    />
+    <title>Finance — скачать</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Локально · без облака</p>
+        <h1>Finance</h1>
+        <p class="lede">
+          Личные финансы на вашем компьютере: операции, бюджет, цели и отчёты.
+          Данные остаются у вас.
+        </p>
+        <p id="version-line" class="version muted">Загружаю список сборок…</p>
+      </header>
+
+      <section class="downloads" aria-labelledby="downloads-title">
+        <div class="section-head">
+          <h2 id="downloads-title">Скачать</h2>
+          <a id="all-releases" class="ghost-link" href="https://github.com/zhanabekof/finance/releases">
+            Все релизы
+          </a>
+        </div>
+        <div id="download-grid" class="download-grid" role="list"></div>
+        <p id="download-empty" class="empty muted" hidden>
+          Пока нет опубликованных сборок. Загляните на страницу релизов или
+          подождите окончания GitHub Actions.
+        </p>
+      </section>
+
+      <section class="notes" aria-label="Важно">
+        <article>
+          <h3>Перед обновлением</h3>
+          <p>
+            Сделайте бэкап во вкладке «Данные» внутри приложения — так история
+            операций не потеряется при переустановке.
+          </p>
+        </article>
+        <article>
+          <h3>macOS и Windows</h3>
+          <p>
+            Сборки не подписаны магазином. При первом запуске система может
+            предупредить — это ожидаемо для личного распространения.
+          </p>
+        </article>
+      </section>
+
+      <footer class="foot">
+        <a href="https://github.com/zhanabekof/finance">Исходный код</a>
+        <span class="muted">·</span>
+        <span class="muted">Приватные финансы. Локальный SQLite.</span>
+      </footer>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
