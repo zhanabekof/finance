@@ -47,6 +47,30 @@ npm run tauri dev
 npm run tauri build
 ```
 
+## Releases (GitHub Actions)
+
+Workflow [`.github/workflows/release.yml`](./.github/workflows/release.yml) собирает desktop-пакеты для:
+
+- macOS Apple Silicon (`aarch64`)
+- macOS Intel (`x86_64`)
+- Linux x64 (AppImage / deb)
+- Windows x64 (msi / nsis)
+
+**Как выпустить**
+
+1. В настройках репозитория: **Settings → Actions → General → Workflow permissions → Read and write permissions**.
+2. Поднимите версию в `package.json` и `src-tauri/tauri.conf.json` (и при желании в `src-tauri/Cargo.toml`).
+3. Закоммитьте и создайте тег:
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+Либо запустите workflow вручную: **Actions → Release → Run workflow**.
+
+Сборка создаёт **draft** release с артефактами — проверьте файлы и нажмите **Publish release**. Подписи Apple/Windows в CI пока нет (для личного использования обычно достаточно).
+
 ## Установка на iPhone
 
 1. Подключите телефон, доверьте компьютеру.
@@ -92,6 +116,7 @@ src-tauri/
 | `npm run build` | TypeScript + Vite production build |
 | `npm test` | Vitest |
 | `npm run tauri build` | установочный пакет desktop |
+| GitHub Actions `Release` | draft-релизы macOS / Windows / Linux по тегу `v*` |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | проверка Rust |
 
 ## Приватность
