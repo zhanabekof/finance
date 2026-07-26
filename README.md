@@ -82,7 +82,8 @@ git push origin v0.1.1
 
 **Включение один раз**
 
-1. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions**  
+   (workflow сам попробует включить Pages через `enablement: true`, но в UI это всё равно стоит проверить).
 2. Запушьте `site/` на `main` или вручную: **Actions → Pages → Run workflow**.
 3. URL будет вида `https://zhanabekof.github.io/finance/`.
 
