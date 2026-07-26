@@ -9,6 +9,7 @@ import {
 } from "./analytics";
 import {
   buildBudgetSummary,
+  expenseLimitWarning,
   monthBoundsUtc,
   monthsOfYear,
   nextYear,
@@ -17,6 +18,8 @@ import {
   yearBoundsUtc,
   NEAR_LIMIT_RATIO,
 } from "./budget";
+import { BACKUP_FORMAT_VERSION, backupFileName, parseFinanceBackup } from "./backup";
+import { buildRecurringForecast } from "./forecast";
 import { buildGoalProgress, suggestedMonthlyContribution } from "./goals";
 import { formatMoney, formatMinorPlain, parseMoneyInput, sumMinor } from "./money";
 import {
@@ -118,6 +121,84 @@ describe("budget", () => {
     expect(summary.categories.find((c) => c.categoryId === 2)?.remainingMinor).toBe(
       -10_000_00,
     );
+  });
+
+  it("warns near and over category limit without blocking", () => {
+    expect(
+      expenseLimitWarning({
+        categoryName: "Продукты",
+        planMinor: 100_000_00,
+        actualMinor: 80_000_00,
+        addedExpenseMinor: 15_000_00,
+      }),
+    ).toBe('Расход близко к лимиту «Продукты»');
+
+    expect(
+      expenseLimitWarning({
+        categoryName: "Продукты",
+        planMinor: 100_000_00,
+        actualMinor: 95_000_00,
+        addedExpenseMinor: 10_000_00,
+      }),
+    ).toBe('Лимит «Продукты» будет превышен — операция всё равно сохранится');
+
+    expect(
+      expenseLimitWarning({
+        categoryName: "Продукты",
+        planMinor: 100_000_00,
+        actualMinor: 10_000_00,
+        addedExpenseMinor: 5_000_00,
+      }),
+    ).toBeNull();
+  });
+
+  it("parses finance backup JSON and rejects bad versions", () => {
+    const payload = {
+      formatVersion: BACKUP_FORMAT_VERSION,
+      exportedAt: "2026-07-26T12:00:00.000Z",
+      accounts: [],
+      categories: [],
+      transactions: [],
+      budgets: [],
+      budgetLimits: [],
+      yearBudgets: [],
+      yearBudgetLimits: [],
+      goals: [],
+      goalContributions: [],
+    };
+    expect(parseFinanceBackup(payload).exportedAt).toBe(payload.exportedAt);
+    expect(backupFileName(new Date("2026-07-26T12:00:00.000Z"))).toBe(
+      "finance-backup-2026-07-26.json",
+    );
+    expect(() => parseFinanceBackup({ ...payload, formatVersion: 99 })).toThrow(
+      /версия/,
+    );
+  });
+
+  it("forecasts remaining regular income and expense without creating operations", () => {
+    const forecast = buildRecurringForecast([
+      {
+        kind: "income",
+        isEssential: true,
+        planMinor: 400_000_00,
+        actualMinor: 200_000_00,
+      },
+      {
+        kind: "expense",
+        isEssential: true,
+        planMinor: 80_000_00,
+        actualMinor: 30_000_00,
+      },
+      {
+        kind: "expense",
+        isEssential: false,
+        planMinor: 50_000_00,
+        actualMinor: 0,
+      },
+    ]);
+    expect(forecast.expectedRemainingIncomeMinor).toBe(200_000_00);
+    expect(forecast.expectedRemainingExpenseMinor).toBe(50_000_00);
+    expect(forecast.projectedNetDeltaMinor).toBe(150_000_00);
   });
 
   it("plans income by category and keeps expense allocation separate", () => {

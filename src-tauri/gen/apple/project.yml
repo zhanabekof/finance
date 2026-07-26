@@ -1,6 +1,6 @@
 name: finance
 options:
-  bundleIdPrefix: com.finance.app
+  bundleIdPrefix: com.almatzhanabekov.finance
   xcodeVersion: "15.0"
   deploymentTarget:
     iOS: 14.0
@@ -12,7 +12,9 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Finance
-      PRODUCT_BUNDLE_IDENTIFIER: com.finance.app
+      PRODUCT_BUNDLE_IDENTIFIER: com.almatzhanabekov.finance
+      DEVELOPMENT_TEAM: N6AZWX7YTY
+      CODE_SIGN_STYLE: Automatic
 targetTemplates:
   app:
     type: application
@@ -41,6 +43,10 @@ targets:
       path: finance_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
+        NSLocalNetworkUsageDescription: Finance подключается к серверу разработки на вашем Mac по локальной сети.
+        NSBonjourServices: [_http._tcp]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -81,7 +87,7 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      - script: npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:

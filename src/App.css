@@ -31,15 +31,31 @@
 html,
 body,
 #root {
+  height: 100%;
   min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+html {
+  background: var(--paper-deep);
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(26, 155, 142, 0.12), transparent 34%),
+    radial-gradient(circle at 88% 0%, rgba(184, 92, 56, 0.1), transparent 28%),
+    linear-gradient(165deg, var(--paper) 0%, var(--paper-deep) 100%);
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 button,
@@ -62,30 +78,58 @@ select {
 }
 
 .app-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "rail stage";
+  align-items: stretch;
 }
 
 .rail {
   grid-area: rail;
-  padding: 2rem 1.4rem;
-  border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(15, 28, 46, 0.96), #152338);
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  padding: 2.85rem 1.4rem 2rem;
+  border-right: 1px solid rgba(197, 206, 217, 0.18);
+  background: linear-gradient(180deg, #0f1c2e 0%, #152338 100%);
   color: var(--white);
   display: flex;
   flex-direction: column;
   gap: 2rem;
   min-width: 0;
+  overflow: hidden;
+  -webkit-app-region: drag;
+}
+
+.rail .nav,
+.rail .nav-item,
+.rail button,
+.rail a,
+.rail input,
+.rail select {
+  -webkit-app-region: no-drag;
+}
+
+.rail .nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .stage {
   grid-area: stage;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 2rem clamp(1.2rem, 3vw, 2.5rem) 3rem;
+  -webkit-app-region: no-drag;
 }
 
 .brand-mark {
@@ -1480,6 +1524,114 @@ button.cashflow-col.selected {
 
 .tx-form-actions button {
   min-width: 180px;
+}
+
+.tx-form-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.accounts-panel,
+.data-panel {
+  max-width: 1120px;
+}
+
+.accounts-workspace {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.account-form,
+.data-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.account-form h3,
+.data-card h3 {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.15rem;
+}
+
+.account-form label,
+.data-confirm {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.data-confirm {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.55rem;
+}
+
+.data-report-month {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.data-report-month > span {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+
+.account-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.account-list > li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.account-list .mono {
+  margin: 0.25rem 0 0;
+}
+
+.account-actions,
+.account-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.account-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  width: 100%;
+  align-items: center;
+}
+
+.data-card-danger {
+  border-color: color-mix(in srgb, var(--copper) 35%, var(--line));
+}
+
+.data-panel {
+  display: grid;
+  gap: 1rem;
 }
 
 .transactions-toolbar {
@@ -3298,12 +3450,19 @@ button.danger-solid:hover {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     padding: 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(circle at 12% 8%, rgba(26, 155, 142, 0.12), transparent 34%),
+      radial-gradient(circle at 88% 0%, rgba(184, 92, 56, 0.1), transparent 28%),
+      linear-gradient(165deg, var(--paper) 0%, var(--paper-deep) 100%);
   }
 
   .panel,
   .transactions-panel,
   .goals-panel,
   .import-panel,
+  .accounts-panel,
+  .data-panel,
   .converter-panel,
   .categories-panel {
     max-width: none;
@@ -3321,7 +3480,8 @@ button.danger-solid:hover {
 
   .goals-workspace,
   .transactions-workspace,
-  .category-workspace {
+  .category-workspace,
+  .accounts-workspace {
     grid-template-columns: minmax(0, 1fr);
   }
 

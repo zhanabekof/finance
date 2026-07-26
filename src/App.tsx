@@ -1,6 +1,5 @@
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  addTransaction,
   addCategory,
   applyYearBudgetToMonths,
   archiveCategory,
@@ -19,7 +18,6 @@ import {
   updateBudgetPlan,
   updateCategory,
   updateYearBudgetPlan,
-  deleteTransaction,
   type Account,
   type Category,
   type Transaction,
@@ -31,13 +29,16 @@ import {
   type YearBudgetSummary,
 } from "./lib/budget";
 import type { AnalyticsOverview } from "./lib/analytics";
-import { formatMoney, parseMoneyInputOrZero, sumMinor } from "./lib/money";
+import { formatMoney, formatMinorPlain, parseMoneyInputOrZero, sumMinor } from "./lib/money";
 import { OverviewPanel } from "./components/OverviewPanel";
 import { CategoriesPanel } from "./components/CategoriesPanel";
 import { GoalsPanel } from "./components/GoalsPanel";
 import { ImportPanel } from "./components/ImportPanel";
 import { CurrencyConverterPanel } from "./components/CurrencyConverterPanel";
 import { MonthSwitcher } from "./components/MonthSwitcher";
+import { TransactionsPanel } from "./components/TransactionsPanel";
+import { AccountsPanel } from "./components/AccountsPanel";
+import { DataPanel } from "./components/DataPanel";
 import "./App.css";
 
 type Tab =
@@ -45,8 +46,10 @@ type Tab =
   | "transactions"
   | "budget"
   | "goals"
+  | "accounts"
   | "converter"
   | "import"
+  | "data"
   | "categories";
 type BudgetScope = "month" | "year";
 
@@ -55,8 +58,10 @@ const NAV_ITEMS: Array<{ id: Tab; label: string }> = [
   { id: "transactions", label: "Операции" },
   { id: "budget", label: "Бюджет" },
   { id: "goals", label: "Цели" },
+  { id: "accounts", label: "Счета" },
   { id: "converter", label: "Конвертер" },
   { id: "import", label: "Импорт" },
+  { id: "data", label: "Данные" },
   { id: "categories", label: "Категории" },
 ];
 
@@ -74,28 +79,6 @@ const MONTH_LABELS = [
   "Ноя",
   "Дек",
 ];
-
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return iso;
-  }
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function minorToInput(amountMinor: number, currency: string): string {
-  const digits = currency === "KZT" || currency === "USD" || currency === "EUR" ? 2 : 2;
-  const scale = 10 ** digits;
-  const sign = amountMinor < 0 ? "-" : "";
-  const abs = Math.abs(amountMinor);
-  const whole = Math.trunc(abs / scale);
-  const fraction = String(abs % scale).padStart(digits, "0");
-  return `${sign}${whole}.${fraction}`;
-}
 
 function isYearMonth(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -122,7 +105,6 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingBudget, setSavingBudget] = useState(false);
-  const [savingTransaction, setSavingTransaction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const budgetDraftsDirtyRef = useRef(false);
@@ -139,15 +121,6 @@ function App() {
   const [budgetYear, setBudgetYear] = useState(currentYear());
   const [budgetYearDraft, setBudgetYearDraft] = useState(currentYear());
 
-  const [txKind, setTxKind] = useState<"expense" | "income">("expense");
-  const [txTitle, setTxTitle] = useState("");
-  const [txAmount, setTxAmount] = useState("");
-  const [txAccountId, setTxAccountId] = useState<number | "">("");
-  const [txCategoryId, setTxCategoryId] = useState<number | "">("");
-  const [txFilter, setTxFilter] = useState<"all" | "expense" | "income">("all");
-  const [txSearch, setTxSearch] = useState("");
-  const [pendingDeleteTxId, setPendingDeleteTxId] = useState<number | null>(null);
-
   const [plannedIncome, setPlannedIncome] = useState("0.00");
   const [limitDrafts, setLimitDrafts] = useState<Record<number, string>>({});
 
@@ -162,26 +135,6 @@ function App() {
     () => categories.filter((c) => c.kind === "income"),
     [categories],
   );
-  const visibleCategories = txKind === "expense" ? expenseCategories : incomeCategories;
-  const selectedAccount = accounts.find((account) => account.id === txAccountId);
-  const filteredTransactions = useMemo(() => {
-    const query = txSearch.trim().toLocaleLowerCase("ru");
-    return transactions.filter((transaction) => {
-      if (txFilter === "expense" && transaction.amount_minor >= 0) {
-        return false;
-      }
-      if (txFilter === "income" && transaction.amount_minor < 0) {
-        return false;
-      }
-      if (!query) {
-        return true;
-      }
-      return [transaction.title, transaction.category_name, transaction.account_name]
-        .filter((value): value is string => Boolean(value))
-        .some((value) => value.toLocaleLowerCase("ru").includes(query));
-    });
-  }, [transactions, txFilter, txSearch]);
-
   const draftIncomePlanMinor = useMemo(
     () =>
       sumDraftMinor(
@@ -239,14 +192,13 @@ function App() {
     const [accs, cats, txs] = await Promise.all([
       listAccounts(),
       listCategories(),
-      listTransactions(80),
+      listTransactions(500),
     ]);
     setAccounts(accs);
     setCategories(cats);
     setTransactions(txs);
 
     const currency = accs[0]?.currency ?? "KZT";
-    setTxAccountId((prev) => (prev === "" && accs[0] ? accs[0].id : prev));
 
     // Avoid parallel getOrCreateBudget for the same month (UNIQUE race).
     const fullAnalytics = await getFullAnalytics(currency, safeOverviewMonth);
@@ -282,7 +234,7 @@ function App() {
       for (const category of cats) {
         const limit = limits.find((item) => item.category_id === category.id);
         drafts[category.id] = limit
-          ? minorToInput(limit.limit_minor, currency)
+          ? formatMinorPlain(limit.limit_minor, currency)
           : "0.00";
         if (category.kind === "income" && limit) {
           incomePlanMinor += limit.limit_minor;
@@ -290,7 +242,7 @@ function App() {
       }
       setLimitDrafts(drafts);
       setPlannedIncome(
-        minorToInput(
+        formatMinorPlain(
           incomePlanMinor > 0 ? incomePlanMinor : monthBudget.planned_income_minor,
           currency,
         ),
@@ -309,7 +261,7 @@ function App() {
     for (const category of cats) {
       const limit = limits.find((item) => item.category_id === category.id);
       drafts[category.id] = limit
-        ? minorToInput(limit.limit_minor, currency)
+        ? formatMinorPlain(limit.limit_minor, currency)
         : "0.00";
       if (category.kind === "income" && limit) {
         incomePlanMinor += limit.limit_minor;
@@ -317,7 +269,7 @@ function App() {
     }
     setLimitDrafts(drafts);
     setPlannedIncome(
-      minorToInput(
+      formatMinorPlain(
         incomePlanMinor > 0 ? incomePlanMinor : yearBudget.planned_income_minor,
         currency,
       ),
@@ -401,50 +353,6 @@ function App() {
     if (target.tagName === "INPUT") {
       // Enter in amount fields must not auto-submit and wipe the screen mid-edit.
       event.preventDefault();
-    }
-  }
-
-  async function onAddTransaction(event: FormEvent) {
-    event.preventDefault();
-    setNotice(null);
-    if (txAccountId === "") {
-      setError("Выберите счёт");
-      return;
-    }
-    setSavingTransaction(true);
-    try {
-      const account = accounts.find((a) => a.id === txAccountId);
-      if (!account) {
-        throw new Error("Счёт не найден");
-      }
-      await addTransaction({
-        accountId: txAccountId,
-        categoryId: txCategoryId === "" ? null : txCategoryId,
-        title: txTitle,
-        amountInput: txAmount,
-        kind: txKind,
-        currency: account.currency,
-      });
-      setTxTitle("");
-      setTxAmount("");
-      setNotice(txKind === "expense" ? "Расход записан" : "Доход записан");
-      await refresh();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSavingTransaction(false);
-    }
-  }
-
-  async function onDeleteTx(id: number) {
-    setNotice(null);
-    try {
-      await deleteTransaction(id);
-      setPendingDeleteTxId(null);
-      setNotice("Операция удалена");
-      await refresh();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -557,9 +465,6 @@ function App() {
     setError(null);
     try {
       await archiveCategory(id);
-      if (txCategoryId === id) {
-        setTxCategoryId("");
-      }
       setNotice("Категория удалена. История операций сохранена.");
       await reloadAfterCategoryChange();
     } catch (err: unknown) {
@@ -629,221 +534,16 @@ function App() {
           ))}
 
         {tab === "transactions" && (
-          <section className="panel transactions-panel">
-            <header className="panel-head transactions-head">
-              <div>
-                <p className="eyebrow">Движение средств</p>
-                <h2>Операции</h2>
-                <p className="muted">Запишите движение денег — баланс обновится автоматически.</p>
-              </div>
-              <div className="transactions-count">
-                <strong className="mono">{transactions.length}</strong>
-                <span>операций</span>
-              </div>
-            </header>
-
-            <div className="transactions-workspace">
-              <form className="tx-form" onSubmit={onAddTransaction}>
-              <div className="tx-form-top">
-                <div className="kind-toggle tx-kind-toggle" role="group" aria-label="Тип операции">
-                  <button
-                    type="button"
-                    className={txKind === "expense" ? "active expense-active" : ""}
-                    onClick={() => {
-                      setTxKind("expense");
-                      setTxCategoryId("");
-                    }}
-                  >
-                    <span aria-hidden>−</span> Расход
-                  </button>
-                  <button
-                    type="button"
-                    className={txKind === "income" ? "active income-active" : ""}
-                    onClick={() => {
-                      setTxKind("income");
-                      setTxCategoryId("");
-                    }}
-                  >
-                    <span aria-hidden>+</span> Доход
-                  </button>
-                </div>
-
-                <label className={`tx-amount-field ${txKind}`}>
-                  <span>Сумма</span>
-                  <div>
-                    <b aria-hidden>{txKind === "expense" ? "−" : "+"}</b>
-                    <input
-                      className="mono"
-                      value={txAmount}
-                      onChange={(e) => setTxAmount(e.currentTarget.value)}
-                      placeholder="0.00"
-                      inputMode="decimal"
-                      autoFocus
-                      required
-                    />
-                    <em>{selectedAccount?.currency ?? primaryCurrency}</em>
-                  </div>
-                </label>
-              </div>
-
-              <div className="tx-fields">
-                <label className="tx-title-field">
-                  <span>Описание</span>
-                  <input
-                    value={txTitle}
-                    onChange={(e) => setTxTitle(e.currentTarget.value)}
-                    placeholder={txKind === "expense" ? "Например, продукты" : "Например, зарплата"}
-                    required
-                  />
-                </label>
-                <label>
-                  <span>Счёт</span>
-                  <select
-                    value={txAccountId}
-                    onChange={(e) => setTxAccountId(Number(e.currentTarget.value))}
-                    required
-                  >
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name} · {account.currency}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Категория</span>
-                  <select
-                    value={txCategoryId}
-                    onChange={(e) =>
-                      setTxCategoryId(
-                        e.currentTarget.value === "" ? "" : Number(e.currentTarget.value),
-                      )
-                    }
-                    required={txKind === "expense"}
-                  >
-                    <option value="">
-                      {txKind === "expense" ? "Выберите категорию" : "Без категории"}
-                    </option>
-                    {visibleCategories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                        {category.is_essential
-                          ? txKind === "expense"
-                            ? " · обязательно"
-                            : " · регулярно"
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="tx-form-actions">
-                <span className="muted">
-                  {txKind === "expense" ? "Сумма спишется со счёта" : "Сумма поступит на счёт"}
-                </span>
-                <button type="submit" disabled={savingTransaction}>
-                  {savingTransaction
-                    ? "Записываю…"
-                    : txKind === "expense"
-                      ? "Записать расход"
-                      : "Записать доход"}
-                </button>
-              </div>
-              </form>
-
-              <div className="transactions-history">
-                <div className="transactions-toolbar">
-                  <div>
-                    <h3>История</h3>
-                    <span className="muted">{filteredTransactions.length} показано</span>
-                  </div>
-                  <input
-                    type="search"
-                    value={txSearch}
-                    onChange={(e) => setTxSearch(e.currentTarget.value)}
-                    placeholder="Поиск операций"
-                    aria-label="Поиск операций"
-                  />
-                  <div className="tx-filter" role="group" aria-label="Фильтр операций">
-                    {(["all", "expense", "income"] as const).map((filter) => (
-                      <button
-                        key={filter}
-                        type="button"
-                        className={txFilter === filter ? "active" : ""}
-                        onClick={() => setTxFilter(filter)}
-                      >
-                        {filter === "all" ? "Все" : filter === "expense" ? "Расходы" : "Доходы"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <ul className="ledger-list transactions">
-                  {filteredTransactions.map((tx) => (
-                    <li key={tx.id} className={tx.amount_minor >= 0 ? "tx-income" : "tx-expense"}>
-                      <span className="tx-direction" aria-hidden>
-                        {tx.amount_minor >= 0 ? "↙" : "↗"}
-                      </span>
-                      <div className="tx-copy">
-                        <strong>{tx.title}</strong>
-                        <span className="muted">
-                          {tx.category_name ?? "Без категории"}
-                          {tx.account_name ? ` · ${tx.account_name}` : ""}
-                        </span>
-                      </div>
-                      <time className="muted" dateTime={tx.occurred_at}>
-                        {formatDate(tx.occurred_at)}
-                      </time>
-                      <span
-                        className={`mono tx-value ${
-                          tx.amount_minor >= 0 ? "income" : "expense"
-                        }`}
-                      >
-                        {formatMoney(tx.amount_minor, tx.currency)}
-                      </span>
-                      <div className="tx-delete">
-                        {pendingDeleteTxId === tx.id ? (
-                          <>
-                            <button
-                              type="button"
-                              className="ghost compact"
-                              onClick={() => setPendingDeleteTxId(null)}
-                            >
-                              Отмена
-                            </button>
-                            <button
-                              type="button"
-                              className="danger-solid compact"
-                              onClick={() => onDeleteTx(tx.id)}
-                            >
-                              Подтвердить
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            className="ghost compact tx-delete-trigger"
-                            onClick={() => setPendingDeleteTxId(tx.id)}
-                            aria-label={`Удалить операцию ${tx.title}`}
-                          >
-                            Удалить
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                  {filteredTransactions.length === 0 && (
-                    <li className="empty transactions-empty">
-                      {transactions.length === 0
-                        ? "История пуста. Запишите первую операцию слева."
-                        : "По этому запросу операций не найдено."}
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </section>
+          <TransactionsPanel
+            accounts={accounts}
+            categories={categories}
+            transactions={transactions}
+            primaryCurrency={primaryCurrency}
+            onChanged={async () => {
+              setNotice(null);
+              await refresh();
+            }}
+          />
         )}
 
         {tab === "budget" && (
@@ -1209,6 +909,16 @@ function App() {
           />
         )}
 
+        {tab === "accounts" && (
+          <AccountsPanel
+            accounts={accounts}
+            onChanged={async () => {
+              setNotice(null);
+              await refresh();
+            }}
+          />
+        )}
+
         {tab === "converter" && (
           <CurrencyConverterPanel defaultCurrency={primaryCurrency} />
         )}
@@ -1219,6 +929,17 @@ function App() {
             categories={categories}
             onImported={async () => {
               setNotice("Выписка импортирована");
+              await refresh();
+            }}
+          />
+        )}
+
+        {tab === "data" && (
+          <DataPanel
+            currency={primaryCurrency}
+            defaultYearMonth={overviewMonth}
+            onRestored={async () => {
+              setNotice("Данные восстановлены из бэкапа");
               await refresh();
             }}
           />

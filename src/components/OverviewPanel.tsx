@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { AnalyticsOverview } from "../lib/analytics";
 import { formatPercent } from "../lib/analytics";
+import { buildRecurringForecast } from "../lib/forecast";
 import { formatMoney } from "../lib/money";
 import { MonthSwitcher } from "./MonthSwitcher";
 
@@ -81,6 +82,14 @@ export function OverviewPanel({
   const dailyAllowance =
     remainingDays > 0 && remainingBudget > 0 ? Math.trunc(remainingBudget / remainingDays) : 0;
   const projectedExpense = month.avgDailyExpenseMinor * month.daysInMonth;
+  const recurringForecast = buildRecurringForecast(
+    monthBudget.categories.map((row) => ({
+      kind: row.kind,
+      isEssential: row.isEssential,
+      planMinor: row.planMinor,
+      actualMinor: row.actualMinor,
+    })),
+  );
   const topExpense = month.expenseCategories[0];
   const hasActivity = month.incomeMinor > 0 || month.expenseMinor > 0;
   const budgetConfigured =
@@ -161,7 +170,21 @@ export function OverviewPanel({
           >
             {formatMoney(projectedExpense, currency)}
           </strong>
-          <p>При текущем среднем темпе</p>
+          <p>
+            По темпу
+            {recurringForecast.expectedRemainingExpenseMinor > 0
+              ? ` · ещё ${formatMoney(
+                  recurringForecast.expectedRemainingExpenseMinor,
+                  currency,
+                )} обязательных по плану`
+              : ""}
+            {recurringForecast.expectedRemainingIncomeMinor > 0
+              ? ` · +${formatMoney(
+                  recurringForecast.expectedRemainingIncomeMinor,
+                  currency,
+                )} регулярных доходов`
+              : ""}
+          </p>
         </article>
         <article>
           <span className="metric-label">Крупнейшая категория</span>

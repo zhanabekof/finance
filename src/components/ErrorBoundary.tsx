@@ -5,29 +5,28 @@ type Props = {
 };
 
 type State = {
-  message: string | null;
+  failed: boolean;
 };
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { message: null };
+  state: State = { failed: false };
 
-  static getDerivedStateFromError(error: unknown): State {
-    return {
-      message: error instanceof Error ? error.message : String(error),
-    };
+  static getDerivedStateFromError(_error: unknown): State {
+    return { failed: true };
   }
 
-  componentDidCatch(error: unknown, _info: ErrorInfo) {
-    console.error(error);
+  componentDidCatch(_error: unknown, _info: ErrorInfo) {
+    // Avoid logging error payloads — they may contain titles, amounts, or other PII.
+    console.error("Unhandled UI error");
   }
 
   render() {
-    if (this.state.message) {
+    if (this.state.failed) {
       return (
         <div className="app-shell" style={{ padding: "2rem" }}>
           <h1>Что-то пошло не так</h1>
-          <p role="alert">{this.state.message}</p>
-          <button type="button" onClick={() => this.setState({ message: null })}>
+          <p role="alert">Приложение столкнулось с ошибкой. Попробуйте снова.</p>
+          <button type="button" onClick={() => this.setState({ failed: false })}>
             Попробовать снова
           </button>
         </div>

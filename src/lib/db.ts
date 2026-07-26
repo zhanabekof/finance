@@ -141,11 +141,119 @@ function newTransferGroupId(): string {
   return `tr_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-export async function listAccounts(): Promise<Account[]> {
+export async function listAccounts(includeArchived = false): Promise<Account[]> {
   const db = await getDb();
+  if (includeArchived) {
+    return db.select<Account[]>(
+      "SELECT id, name, currency, archived, created_at FROM accounts ORDER BY archived ASC, id ASC",
+    );
+  }
   return db.select<Account[]>(
     "SELECT id, name, currency, archived, created_at FROM accounts WHERE archived = 0 ORDER BY id ASC",
   );
+}
+
+const ACCOUNT_CURRENCIES = new Set(["KZT", "USD", "EUR", "RUB", "GBP", "CNY"]);
+
+export async function addAccount(input: {
+  name: string;
+  currency: string;
+}): Promise<Account> {
+  const name = input.name.trim();
+  const currency = input.currency.trim().toUpperCase();
+  if (!name) {
+    throw new Error("Укажите название счёта");
+  }
+  if (name.length > 80) {
+    throw new Error("Название слишком длинное");
+  }
+  if (!ACCOUNT_CURRENCIES.has(currency) && !/^[A-Z]{3}$/.test(currency)) {
+    throw new Error("Укажите валюту ISO 4217 (например KZT)");
+  }
+
+  const db = await getDb();
+  const duplicates = await db.select<Account[]>(
+    `SELECT id, name, currency, archived, created_at
+     FROM accounts
+     WHERE archived = 0 AND lower(name) = lower($1)`,
+    [name],
+  );
+  if (duplicates[0]) {
+    throw new Error("Такой счёт уже есть");
+  }
+
+  await db.execute(
+    `INSERT INTO accounts (name, currency, archived, created_at)
+     VALUES ($1, $2, 0, $3)`,
+    [name, currency, nowIso()],
+  );
+
+  const created = await db.select<Account[]>(
+    `SELECT id, name, currency, archived, created_at
+     FROM accounts
+     WHERE archived = 0 AND name = $1
+     ORDER BY id DESC
+     LIMIT 1`,
+    [name],
+  );
+  if (!created[0]) {
+    throw new Error("Не удалось создать счёт");
+  }
+  return created[0];
+}
+
+export async function updateAccount(input: {
+  id: number;
+  name: string;
+}): Promise<void> {
+  const name = input.name.trim();
+  if (!name) {
+    throw new Error("Укажите название счёта");
+  }
+  if (name.length > 80) {
+    throw new Error("Название слишком длинное");
+  }
+
+  const db = await getDb();
+  const existing = await db.select<Account[]>(
+    "SELECT id, name, currency, archived, created_at FROM accounts WHERE id = $1 AND archived = 0",
+    [input.id],
+  );
+  if (!existing[0]) {
+    throw new Error("Счёт не найден");
+  }
+
+  const duplicates = await db.select<Account[]>(
+    `SELECT id FROM accounts
+     WHERE archived = 0 AND lower(name) = lower($1) AND id <> $2`,
+    [name, input.id],
+  );
+  if (duplicates[0]) {
+    throw new Error("Такой счёт уже есть");
+  }
+
+  await db.execute("UPDATE accounts SET name = $1 WHERE id = $2", [name, input.id]);
+}
+
+export async function archiveAccount(id: number): Promise<void> {
+  const db = await getDb();
+  const existing = await db.select<Account[]>(
+    "SELECT id, name, currency, archived, created_at FROM accounts WHERE id = $1 AND archived = 0",
+    [id],
+  );
+  if (!existing[0]) {
+    throw new Error("Счёт не найден");
+  }
+
+  const active = await db.select<{ count: number }[]>(
+    "SELECT COUNT(*) AS count FROM accounts WHERE archived = 0",
+  );
+  if ((active[0]?.count ?? 0) <= 1) {
+    throw new Error("Нельзя архивировать единственный активный счёт");
+  }
+
+  // Soft-archive only — transaction history is preserved.
+  await db.execute("UPDATE accounts SET archived = 1 WHERE id = $1", [id]);
 }
 
 export async function listCategories(kind?: "income" | "expense"): Promise<Category[]> {
@@ -491,11 +599,105 @@ export async function deleteTransaction(id: number): Promise<void> {
   await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
 }
 
+export type UpdateTransactionInput = {
+  id: number;
+  accountId: number;
+  categoryId: number | null;
+  title: string;
+  amountInput: string;
+  kind: "income" | "expense";
+  currency: string;
+  occurredAt: string;
+};
+
+export async function updateTransaction(input: UpdateTransactionInput): Promise<void> {
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("Укажите описание операции");
+  }
+  if (Number.isNaN(Date.parse(input.occurredAt))) {
+    throw new Error("Некорректная дата операции");
+  }
+
+  let amountMinor = parseMoneyInput(input.amountInput, input.currency);
+  if (amountMinor === 0) {
+    throw new Error("Сумма не может быть нулевой");
+  }
+  if (input.kind === "income" && amountMinor < 0) {
+    amountMinor = Math.abs(amountMinor);
+  }
+  if (input.kind === "expense" && amountMinor > 0) {
+    amountMinor = -amountMinor;
+  }
+  if (input.kind === "expense" && input.categoryId == null) {
+    throw new Error("Для расхода выберите категорию");
+  }
+
+  const db = await getDb();
+  const existing = await db.select<{ id: number; transfer_group_id: string | null }[]>(
+    "SELECT id, transfer_group_id FROM transactions WHERE id = $1",
+    [input.id],
+  );
+  if (!existing[0]) {
+    throw new Error("Операция не найдена");
+  }
+  if (existing[0].transfer_group_id) {
+    throw new Error("Перевод нельзя редактировать — удалите и создайте заново");
+  }
+
+  const accounts = await db.select<Account[]>(
+    "SELECT id, name, currency, archived, created_at FROM accounts WHERE id = $1 AND archived = 0",
+    [input.accountId],
+  );
+  const account = accounts[0];
+  if (!account) {
+    throw new Error("Счёт не найден");
+  }
+  if (account.currency !== input.currency) {
+    throw new Error("Валюта операции должна совпадать с валютой счёта");
+  }
+
+  if (input.categoryId != null) {
+    const categories = await db.select<Category[]>(
+      "SELECT id, name, kind, is_essential, archived FROM categories WHERE id = $1 AND archived = 0",
+      [input.categoryId],
+    );
+    const category = categories[0];
+    if (!category) {
+      throw new Error("Категория не найдена");
+    }
+    if (category.kind !== input.kind) {
+      throw new Error("Тип категории не совпадает с типом операции");
+    }
+  }
+
+  await db.execute(
+    `UPDATE transactions
+     SET account_id = $1,
+         category_id = $2,
+         title = $3,
+         amount_minor = $4,
+         currency = $5,
+         occurred_at = $6
+     WHERE id = $7`,
+    [
+      input.accountId,
+      input.categoryId,
+      title,
+      amountMinor,
+      input.currency,
+      input.occurredAt,
+      input.id,
+    ],
+  );
+}
+
 export async function transferBetweenAccounts(input: {
   fromAccountId: number;
   toAccountId: number;
   amountInput: string;
   title?: string;
+  occurredAt?: string;
 }): Promise<void> {
   if (input.fromAccountId === input.toAccountId) {
     throw new Error("Выберите разные счета");
@@ -521,26 +723,50 @@ export async function transferBetweenAccounts(input: {
   }
 
   const groupId = newTransferGroupId();
-  const occurredAt = nowIso();
+  const occurredAt =
+    input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt))
+      ? input.occurredAt
+      : nowIso();
   const createdAt = nowIso();
   const title = (input.title ?? "Перевод").trim() || "Перевод";
 
-  // Two linked legs; plugin has no multi-statement transaction API.
-  await db.execute(
-    `INSERT INTO transactions
-      (account_id, category_id, title, amount_minor, currency, occurred_at, transfer_group_id, created_at)
-     VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)`,
-    [from.id, `${title} → ${to.name}`, -amountMinor, from.currency, occurredAt, groupId, createdAt],
-  );
+  await db.execute("BEGIN IMMEDIATE");
   try {
     await db.execute(
       `INSERT INTO transactions
         (account_id, category_id, title, amount_minor, currency, occurred_at, transfer_group_id, created_at)
        VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)`,
-      [to.id, `${title} ← ${from.name}`, amountMinor, to.currency, occurredAt, groupId, createdAt],
+      [
+        from.id,
+        `${title} → ${to.name}`,
+        -amountMinor,
+        from.currency,
+        occurredAt,
+        groupId,
+        createdAt,
+      ],
     );
+    await db.execute(
+      `INSERT INTO transactions
+        (account_id, category_id, title, amount_minor, currency, occurred_at, transfer_group_id, created_at)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)`,
+      [
+        to.id,
+        `${title} ← ${from.name}`,
+        amountMinor,
+        to.currency,
+        occurredAt,
+        groupId,
+        createdAt,
+      ],
+    );
+    await db.execute("COMMIT");
   } catch (error) {
-    await db.execute("DELETE FROM transactions WHERE transfer_group_id = $1", [groupId]);
+    try {
+      await db.execute("ROLLBACK");
+    } catch {
+      await db.execute("DELETE FROM transactions WHERE transfer_group_id = $1", [groupId]);
+    }
     throw error;
   }
 }
@@ -1601,6 +1827,7 @@ export async function addGoalContribution(input: {
   const stamp = nowIso();
   let transactionId: number | null = null;
 
+  await db.execute("BEGIN IMMEDIATE");
   try {
     const txResult = await db.execute(
       `INSERT INTO transactions
@@ -1632,9 +1859,14 @@ export async function addGoalContribution(input: {
       stamp,
       input.goalId,
     ]);
+    await db.execute("COMMIT");
   } catch (error) {
-    if (transactionId != null) {
-      await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+    try {
+      await db.execute("ROLLBACK");
+    } catch {
+      if (transactionId != null) {
+        await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+      }
     }
     throw error;
   }

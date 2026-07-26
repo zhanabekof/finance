@@ -87,6 +87,33 @@ function buildCategoryRow(
   };
 }
 
+export function expenseLimitWarning(input: {
+  categoryName: string;
+  planMinor: number;
+  actualMinor: number;
+  addedExpenseMinor: number;
+}): string | null {
+  const plan = input.planMinor;
+  if (!Number.isSafeInteger(plan) || plan <= 0) {
+    return null;
+  }
+  const added = Math.abs(input.addedExpenseMinor);
+  if (!Number.isSafeInteger(added) || added <= 0) {
+    return null;
+  }
+  const nextActual = input.actualMinor + added;
+  if (!Number.isSafeInteger(nextActual)) {
+    return null;
+  }
+  if (nextActual > plan) {
+    return `Лимит «${input.categoryName}» будет превышен — операция всё равно сохранится`;
+  }
+  if (nextActual / plan >= NEAR_LIMIT_RATIO) {
+    return `Расход близко к лимиту «${input.categoryName}»`;
+  }
+  return null;
+}
+
 export function buildBudgetSummary(input: {
   currency: string;
   plannedIncomeMinor: number;
