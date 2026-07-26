@@ -205,7 +205,15 @@
           </a>
         </div>
 
-        <div id="download-grid" class="download-grid" role="list"></div>
+        <div id="download-primary" class="download-primary"></div>
+
+        <div class="download-other-wrap">
+          <button type="button" id="other-os-btn" class="btn-other-os" hidden>
+            Другие ОС
+          </button>
+          <div id="download-grid" class="download-grid" role="list" hidden></div>
+        </div>
+
         <p id="download-empty" class="empty muted" hidden>
           Пока нет опубликованных сборок. Откройте релизы на GitHub или
           дождитесь окончания сборки.
