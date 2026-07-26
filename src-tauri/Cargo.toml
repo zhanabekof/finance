@@ -1,6 +1,6 @@
 [package]
 name = "finance"
-version = "0.1.0"
+version = "0.1.1"
 description = "Finance desktop app with Tauri and SQLite"
 authors = ["you"]
 edition = "2021"

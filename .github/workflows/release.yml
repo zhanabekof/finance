@@ -9,9 +9,11 @@ on:
 permissions:
   contents: write
 
+# One run per tag/ref. Do NOT cancel in-progress: matrix jobs share the group
+# and a second dispatch must not kill an active multi-platform build.
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -77,8 +79,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__
-          releaseName: Finance v__VERSION__
+          # Prefer the pushed tag (v0.1.1), not a mismatched __VERSION__ from config.
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v__VERSION__' }}
+          releaseName: Finance ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v__VERSION__' }}
           releaseBody: |
             Сборки Finance для desktop.
 
@@ -88,6 +91,7 @@ jobs:
             - **Linux**: `.AppImage` / `.deb`
 
             Данные приложения локальные (SQLite). Перед обновлением полезно сделать бэкап во вкладке «Данные».
-          releaseDraft: true
+          # Attach binaries to the real release the tag points at (not a separate draft).
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

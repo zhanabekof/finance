@@ -69,7 +69,10 @@ git push origin v0.1.1
 
 Либо запустите workflow вручную: **Actions → Release → Run workflow**.
 
-Сборка создаёт **draft** release с артефактами — проверьте файлы и нажмите **Publish release**. Подписи Apple/Windows в CI пока нет (для личного использования обычно достаточно).
+Сборка прикрепляет бинарники к релизу с тем же тегом (`v0.1.1` → Release `v0.1.1`).  
+Версия в `package.json` и `src-tauri/tauri.conf.json` должна совпадать с тегом.
+
+Не создавайте пустой Release вручную до окончания Actions — дождитесь зелёного workflow **Release**, иначе получите релиз без файлов. Подписи Apple/Windows в CI пока нет.
 
 ## Установка на iPhone
 
