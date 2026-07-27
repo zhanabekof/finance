@@ -1,3 +1,5 @@
+mod telegram_service;
+
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -196,6 +198,17 @@ pub fn run() {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "app_settings",
+            sql: "
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY NOT NULL,
+                    value TEXT NOT NULL
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -205,6 +218,11 @@ pub fn run() {
                 .add_migrations("sqlite:finance.db", migrations)
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![
+            telegram_service::telegram_daemon_status,
+            telegram_service::install_telegram_daemon,
+            telegram_service::uninstall_telegram_daemon,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

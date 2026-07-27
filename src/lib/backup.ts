@@ -1,6 +1,7 @@
 import {
   getDb,
   type Account,
+  type AppSetting,
   type Budget,
   type BudgetLimit,
   type Category,
@@ -27,6 +28,7 @@ export type FinanceBackup = {
   yearBudgetLimits: YearBudgetLimit[];
   goals: Goal[];
   goalContributions: GoalContribution[];
+  appSettings?: AppSetting[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,6 +67,9 @@ export function parseFinanceBackup(payload: unknown): FinanceBackup {
     yearBudgetLimits: requireArray(payload.yearBudgetLimits, "yearBudgetLimits"),
     goals: requireArray(payload.goals, "goals"),
     goalContributions: requireArray(payload.goalContributions, "goalContributions"),
+    appSettings: Array.isArray(payload.appSettings)
+      ? (payload.appSettings as AppSetting[])
+      : [],
   };
 }
 
@@ -86,6 +91,7 @@ export async function exportFinanceBackup(): Promise<FinanceBackup> {
     yearBudgetLimits,
     goals,
     goalContributions,
+    appSettings,
   ] = await Promise.all([
     db.select<Account[]>(
       "SELECT id, name, currency, archived, created_at FROM accounts ORDER BY id ASC",
@@ -119,6 +125,7 @@ export async function exportFinanceBackup(): Promise<FinanceBackup> {
       `SELECT id, goal_id, amount_minor, note, contributed_at, created_at, transaction_id
        FROM goal_contributions ORDER BY id ASC`,
     ),
+    db.select<AppSetting[]>("SELECT key, value FROM app_settings ORDER BY key ASC"),
   ]);
 
   return {
@@ -133,6 +140,7 @@ export async function exportFinanceBackup(): Promise<FinanceBackup> {
     yearBudgetLimits,
     goals,
     goalContributions,
+    appSettings,
   };
 }
 
@@ -157,6 +165,7 @@ export async function restoreFinanceBackup(backup: FinanceBackup): Promise<void>
       await db.execute("DELETE FROM transactions");
       await db.execute("DELETE FROM categories");
       await db.execute("DELETE FROM accounts");
+      await db.execute("DELETE FROM app_settings");
 
       for (const account of parsed.accounts) {
         await db.execute(
@@ -278,6 +287,12 @@ export async function restoreFinanceBackup(backup: FinanceBackup): Promise<void>
             contribution.created_at,
             contribution.transaction_id ?? null,
           ],
+        );
+      }
+      for (const setting of parsed.appSettings ?? []) {
+        await db.execute(
+          `INSERT INTO app_settings (key, value) VALUES ($1, $2)`,
+          [setting.key, setting.value],
         );
       }
 

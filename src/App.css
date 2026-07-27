@@ -1634,6 +1634,53 @@ button.cashflow-col.selected {
   gap: 1rem;
 }
 
+.telegram-token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.telegram-service-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.telegram-panel label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.telegram-panel label > span {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+
+.telegram-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+  color: var(--ink-soft);
+}
+
+.telegram-help {
+  margin: 0.85rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+
 .transactions-toolbar {
   display: grid;
   grid-template-columns: minmax(130px, 1fr) minmax(220px, 0.9fr) auto;

@@ -1885,3 +1885,88 @@ function normalizeDeadline(value?: string | null): string | null {
   }
   return trimmed;
 }
+
+export type AppSetting = {
+  key: string;
+  value: string;
+};
+
+export async function getSetting(key: string): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.select<{ value: string }[]>(
+    "SELECT value FROM app_settings WHERE key = $1",
+    [key],
+  );
+  return rows[0]?.value ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, value],
+  );
+}
+
+export async function deleteSetting(key: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM app_settings WHERE key = $1", [key]);
+}
+
+export async function listSettings(): Promise<AppSetting[]> {
+  const db = await getDb();
+  return db.select<AppSetting[]>(
+    "SELECT key, value FROM app_settings ORDER BY key ASC",
+  );
+}
+
+export type TelegramBotSettings = {
+  enabled: boolean;
+  serviceMode: boolean;
+  botToken: string;
+  allowedChatId: string | null;
+  defaultAccountId: number | null;
+};
+
+const TG_ENABLED = "telegram.enabled";
+const TG_SERVICE = "telegram.service_mode";
+const TG_TOKEN = "telegram.bot_token";
+const TG_CHAT = "telegram.allowed_chat_id";
+const TG_ACCOUNT = "telegram.default_account_id";
+
+export async function getTelegramBotSettings(): Promise<TelegramBotSettings> {
+  const [enabled, serviceMode, botToken, chatId, accountId] = await Promise.all([
+    getSetting(TG_ENABLED),
+    getSetting(TG_SERVICE),
+    getSetting(TG_TOKEN),
+    getSetting(TG_CHAT),
+    getSetting(TG_ACCOUNT),
+  ]);
+  const parsedAccount = accountId != null ? Number(accountId) : NaN;
+  return {
+    enabled: enabled === "1",
+    serviceMode: serviceMode === "1",
+    botToken: botToken ?? "",
+    allowedChatId: chatId && chatId.trim() ? chatId.trim() : null,
+    defaultAccountId: Number.isSafeInteger(parsedAccount) ? parsedAccount : null,
+  };
+}
+
+export async function saveTelegramBotSettings(
+  input: TelegramBotSettings,
+): Promise<void> {
+  await setSetting(TG_ENABLED, input.enabled ? "1" : "0");
+  await setSetting(TG_SERVICE, input.serviceMode ? "1" : "0");
+  await setSetting(TG_TOKEN, input.botToken.trim());
+  if (input.allowedChatId && input.allowedChatId.trim()) {
+    await setSetting(TG_CHAT, input.allowedChatId.trim());
+  } else {
+    await deleteSetting(TG_CHAT);
+  }
+  if (input.defaultAccountId != null) {
+    await setSetting(TG_ACCOUNT, String(input.defaultAccountId));
+  } else {
+    await deleteSetting(TG_ACCOUNT);
+  }
+}

@@ -18,6 +18,7 @@ import {
   updateBudgetPlan,
   updateCategory,
   updateYearBudgetPlan,
+  getTelegramBotSettings,
   type Account,
   type Category,
   type Transaction,
@@ -39,6 +40,8 @@ import { MonthSwitcher } from "./components/MonthSwitcher";
 import { TransactionsPanel } from "./components/TransactionsPanel";
 import { AccountsPanel } from "./components/AccountsPanel";
 import { DataPanel } from "./components/DataPanel";
+import { TelegramPanel } from "./components/TelegramPanel";
+import { telegramBot } from "./lib/telegramBot";
 import "./App.css";
 
 type Tab =
@@ -50,6 +53,7 @@ type Tab =
   | "converter"
   | "import"
   | "data"
+  | "telegram"
   | "categories";
 type BudgetScope = "month" | "year";
 
@@ -61,6 +65,7 @@ const NAV_ITEMS: Array<{ id: Tab; label: string }> = [
   { id: "accounts", label: "Счета" },
   { id: "converter", label: "Конвертер" },
   { id: "import", label: "Импорт" },
+  { id: "telegram", label: "Telegram" },
   { id: "data", label: "Данные" },
   { id: "categories", label: "Категории" },
 ];
@@ -294,6 +299,39 @@ function App() {
       cancelled = true;
     };
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTelegramBotSettings()
+      .then(async (settings) => {
+        if (
+          cancelled ||
+          !settings.enabled ||
+          !settings.botToken.trim() ||
+          settings.serviceMode
+        ) {
+          return;
+        }
+        try {
+          await telegramBot.start();
+        } catch (err: unknown) {
+          if (!cancelled) {
+            setError(
+              err instanceof Error
+                ? `Telegram: ${err.message}`
+                : "Telegram: не удалось запустить бота",
+            );
+          }
+        }
+      })
+      .catch(() => {
+        // Settings table may not exist yet on first paint before migration.
+      });
+    return () => {
+      cancelled = true;
+      void telegramBot.stop();
+    };
+  }, []);
 
   useEffect(() => {
     budgetDraftsDirtyRef.current = false;
@@ -929,6 +967,15 @@ function App() {
             categories={categories}
             onImported={async () => {
               setNotice("Выписка импортирована");
+              await refresh();
+            }}
+          />
+        )}
+
+        {tab === "telegram" && (
+          <TelegramPanel
+            onChanged={async () => {
+              setNotice("Операция из Telegram записана");
               await refresh();
             }}
           />

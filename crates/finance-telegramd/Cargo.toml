@@ -1,0 +1,17 @@
+[package]
+name = "finance-telegramd"
+version = "0.1.1"
+edition = "2021"
+description = "Background Telegram bot for Finance that writes to the local SQLite database"
+publish = false
+
+[[bin]]
+name = "finance-telegramd"
+path = "src/main.rs"
+
+[dependencies]
+dirs = "5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+ureq = { version = "2.12", features = ["json"] }
