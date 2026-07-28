@@ -37,7 +37,7 @@ import { GoalsPanel } from "./components/GoalsPanel";
 import { ImportPanel } from "./components/ImportPanel";
 import { CurrencyConverterPanel } from "./components/CurrencyConverterPanel";
 import { MonthSwitcher } from "./components/MonthSwitcher";
-import { TransactionsPanel } from "./components/TransactionsPanel";
+import { TransactionsPanel, type TransactionsFocus } from "./components/TransactionsPanel";
 import { AccountsPanel } from "./components/AccountsPanel";
 import { DataPanel } from "./components/DataPanel";
 import { TelegramPanel } from "./components/TelegramPanel";
@@ -128,6 +128,8 @@ function App() {
 
   const [plannedIncome, setPlannedIncome] = useState("0.00");
   const [limitDrafts, setLimitDrafts] = useState<Record<number, string>>({});
+  const [txFocus, setTxFocus] = useState<TransactionsFocus | null>(null);
+  const [txFocusKey, setTxFocusKey] = useState(0);
 
   const primaryCurrency = accounts[0]?.currency ?? "KZT";
   const activeSummary = budgetScope === "month" ? budgetSummary : yearBudgetSummary;
@@ -165,6 +167,15 @@ function App() {
   function goToTab(next: Tab) {
     setTab(next);
     setMenuOpen(false);
+  }
+
+  function openCategoryTransactions(
+    categoryId: number | null,
+    yearMonthValue: string,
+  ) {
+    setTxFocus({ categoryId, yearMonth: yearMonthValue });
+    setTxFocusKey((key) => key + 1);
+    goToTab("transactions");
   }
 
   useEffect(() => {
@@ -332,6 +343,45 @@ function App() {
       void telegramBot.stop();
     };
   }, []);
+
+  // In-app bot: refresh from any tab, not only TelegramPanel.
+  useEffect(() => {
+    return telegramBot.onChanged(() => {
+      void refresh();
+    });
+  }, [refresh]);
+
+  // Background Telegram service writes SQLite directly — re-read while app is open.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const schedule = async () => {
+      try {
+        const settings = await getTelegramBotSettings();
+        if (!cancelled && settings.enabled) {
+          await refresh();
+        }
+      } catch {
+        // Ignore transient DB errors while the window is open.
+      } finally {
+        if (!cancelled) {
+          timer = window.setTimeout(() => {
+            void schedule();
+          }, 1500);
+        }
+      }
+    };
+
+    void schedule();
+
+    return () => {
+      cancelled = true;
+      if (timer != null) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [refresh]);
 
   useEffect(() => {
     budgetDraftsDirtyRef.current = false;
@@ -566,6 +616,9 @@ function App() {
                 goToTab("budget");
               }}
               onOpenTransactions={() => goToTab("transactions")}
+              onOpenCategory={(categoryId) =>
+                openCategoryTransactions(categoryId, overviewMonth)
+              }
             />
           ) : (
             <p className="muted">Загрузка обзора…</p>
@@ -573,10 +626,12 @@ function App() {
 
         {tab === "transactions" && (
           <TransactionsPanel
+            key={txFocusKey}
             accounts={accounts}
             categories={categories}
             transactions={transactions}
             primaryCurrency={primaryCurrency}
+            focus={txFocus}
             onChanged={async () => {
               setNotice(null);
               await refresh();
@@ -721,7 +776,20 @@ function App() {
                         <li key={category.id} className={row?.status ?? "ok"}>
                           <div className="limit-meta">
                             <strong>
-                              {category.name}
+                              {budgetScope === "month" ? (
+                                <button
+                                  type="button"
+                                  className="category-drill"
+                                  onClick={() =>
+                                    openCategoryTransactions(category.id, yearMonth)
+                                  }
+                                  title="Показать операции категории за месяц"
+                                >
+                                  {category.name}
+                                </button>
+                              ) : (
+                                category.name
+                              )}
                               {category.is_essential ? (
                                 <span className="tag">регулярный</span>
                               ) : (
@@ -861,7 +929,20 @@ function App() {
                         <li key={category.id} className={row?.status ?? "ok"}>
                           <div className="limit-meta">
                             <strong>
-                              {category.name}
+                              {budgetScope === "month" ? (
+                                <button
+                                  type="button"
+                                  className="category-drill"
+                                  onClick={() =>
+                                    openCategoryTransactions(category.id, yearMonth)
+                                  }
+                                  title="Показать операции категории за месяц"
+                                >
+                                  {category.name}
+                                </button>
+                              ) : (
+                                category.name
+                              )}
                               {category.is_essential ? (
                                 <span className="tag">обязательно</span>
                               ) : (

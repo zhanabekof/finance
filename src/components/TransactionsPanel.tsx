@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   addTransaction,
   deleteTransaction,
@@ -9,16 +9,37 @@ import {
   type Category,
   type Transaction,
 } from "../lib/db";
-import { expenseLimitWarning } from "../lib/budget";
-import { formatMinorPlain, formatMoney, parseMoneyInput } from "../lib/money";
+import {
+  currentYearMonth,
+  expenseLimitWarning,
+  monthBoundsUtc,
+} from "../lib/budget";
+import { formatMinorPlain, formatMoney, parseMoneyInput, sumMinor } from "../lib/money";
+import { MonthSwitcher } from "./MonthSwitcher";
+
+export type TransactionsFocus = {
+  categoryId: number | null;
+  yearMonth: string;
+};
 
 type Props = {
   accounts: Account[];
   categories: Category[];
   transactions: Transaction[];
   primaryCurrency: string;
+  focus?: TransactionsFocus | null;
   onChanged: () => Promise<void> | void;
 };
+
+type CategoryFilter = "all" | "none" | number;
+
+function parseCategoryFilter(value: string): CategoryFilter {
+  if (value === "all" || value === "none") {
+    return value;
+  }
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : "all";
+}
 
 type TxKind = "expense" | "income" | "transfer";
 
@@ -57,11 +78,27 @@ function amountToInput(amountMinor: number, currency: string): string {
   return formatMinorPlain(Math.abs(amountMinor), currency);
 }
 
+function formatYearMonthLabel(yearMonth: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth);
+  if (!match) {
+    return yearMonth;
+  }
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1));
+  const label = new Intl.DateTimeFormat("ru-RU", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+  return label.charAt(0).toLocaleUpperCase("ru") + label.slice(1);
+}
+
+
 export function TransactionsPanel({
   accounts,
   categories,
   transactions,
   primaryCurrency,
+  focus = null,
   onChanged,
 }: Props) {
   const [txKind, setTxKind] = useState<TxKind>("expense");
@@ -80,10 +117,24 @@ export function TransactionsPanel({
     "all",
   );
   const [txSearch, setTxSearch] = useState("");
+  const [listMonth, setListMonth] = useState(currentYearMonth());
+  const [monthOnly, setMonthOnly] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [pendingDeleteTxId, setPendingDeleteTxId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focus) {
+      return;
+    }
+    setListMonth(focus.yearMonth);
+    setMonthOnly(true);
+    setCategoryFilter(focus.categoryId == null ? "none" : focus.categoryId);
+    setTxFilter("all");
+    setTxSearch("");
+  }, [focus]);
 
   const expenseCategories = useMemo(
     () => categories.filter((category) => category.kind === "expense"),
@@ -99,7 +150,24 @@ export function TransactionsPanel({
 
   const filteredTransactions = useMemo(() => {
     const query = txSearch.trim().toLocaleLowerCase("ru");
+    const bounds = monthOnly ? monthBoundsUtc(listMonth) : null;
     return transactions.filter((transaction) => {
+      if (
+        bounds &&
+        (transaction.occurred_at < bounds.startIso ||
+          transaction.occurred_at >= bounds.endIso)
+      ) {
+        return false;
+      }
+      if (categoryFilter === "none" && transaction.category_id != null) {
+        return false;
+      }
+      if (
+        typeof categoryFilter === "number" &&
+        transaction.category_id !== categoryFilter
+      ) {
+        return false;
+      }
       if (txFilter === "expense" && transaction.amount_minor >= 0) {
         return false;
       }
@@ -116,7 +184,36 @@ export function TransactionsPanel({
         .filter((value): value is string => Boolean(value))
         .some((value) => value.toLocaleLowerCase("ru").includes(query));
     });
-  }, [transactions, txFilter, txSearch]);
+  }, [transactions, txFilter, txSearch, listMonth, monthOnly, categoryFilter]);
+
+  const filteredTotalMinor = useMemo(
+    () => sumMinor(filteredTransactions.map((tx) => tx.amount_minor)),
+    [filteredTransactions],
+  );
+
+  const categoryFilterLabel = useMemo(() => {
+    if (categoryFilter === "all") {
+      return "все категории";
+    }
+    if (categoryFilter === "none") {
+      return "без категории";
+    }
+    return (
+      categories.find((category) => category.id === categoryFilter)?.name ??
+      "категория"
+    );
+  }, [categoryFilter, categories]);
+
+  const hasActiveScope =
+    categoryFilter !== "all" || !monthOnly || listMonth !== currentYearMonth();
+
+  function resetScopeFilters() {
+    setCategoryFilter("all");
+    setMonthOnly(true);
+    setListMonth(currentYearMonth());
+    setTxSearch("");
+    setTxFilter("all");
+  }
 
   function resetForm(kind: TxKind = "expense") {
     setEditingId(null);
@@ -477,35 +574,214 @@ export function TransactionsPanel({
         </form>
 
         <div className="transactions-history">
-          <div className="transactions-toolbar">
-            <div>
-              <h3>История</h3>
-              <span className="muted">{filteredTransactions.length} показано</span>
+          <div className="tx-filter-board">
+            <div className="tx-filter-board-top">
+              <div className="tx-filter-board-title">
+                <p className="eyebrow">Журнал</p>
+                <h3>История</h3>
+              </div>
+              <div className="tx-filter" role="group" aria-label="Тип операций">
+                {(["all", "expense", "income", "transfer"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    className={txFilter === filter ? `active${filter !== "all" ? ` is-${filter}` : ""}` : ""}
+                    onClick={() => setTxFilter(filter)}
+                  >
+                    {filter === "all"
+                      ? "Все"
+                      : filter === "expense"
+                        ? "Расходы"
+                        : filter === "income"
+                          ? "Доходы"
+                          : "Переводы"}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input
-              type="search"
-              value={txSearch}
-              onChange={(event) => setTxSearch(event.currentTarget.value)}
-              placeholder="Поиск операций"
-              aria-label="Поиск операций"
-            />
-            <div className="tx-filter" role="group" aria-label="Фильтр операций">
-              {(["all", "expense", "income", "transfer"] as const).map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  className={txFilter === filter ? "active" : ""}
-                  onClick={() => setTxFilter(filter)}
+
+            <label className="tx-filter-search">
+              <span className="tx-ledger-label">Поиск</span>
+              <input
+                type="search"
+                value={txSearch}
+                onChange={(event) => setTxSearch(event.currentTarget.value)}
+                placeholder="Описание, категория или счёт"
+                aria-label="Поиск операций"
+              />
+            </label>
+
+            <div className="tx-filter-grid" aria-label="Период и категория">
+              <div className="tx-filter-period">
+                <div className="tx-filter-period-head">
+                  <span className="tx-ledger-label">Период</span>
+                  <div
+                    className="tx-segment"
+                    role="group"
+                    aria-label="Режим периода"
+                  >
+                    <button
+                      type="button"
+                      className={monthOnly ? "active" : ""}
+                      onClick={() => setMonthOnly(true)}
+                    >
+                      Месяц
+                    </button>
+                    <button
+                      type="button"
+                      className={!monthOnly ? "active" : ""}
+                      onClick={() => setMonthOnly(false)}
+                    >
+                      Всё время
+                    </button>
+                  </div>
+                </div>
+                {monthOnly ? (
+                  <div className="tx-filter-month-card">
+                    <strong>{formatYearMonthLabel(listMonth)}</strong>
+                    <MonthSwitcher
+                      value={listMonth}
+                      onChange={setListMonth}
+                      ariaLabel="Месяц операций"
+                      showToday
+                    />
+                  </div>
+                ) : (
+                  <div className="tx-filter-month-card is-all">
+                    <strong>Вся история</strong>
+                    <span>Без ограничения по месяцу</span>
+                  </div>
+                )}
+              </div>
+
+              <label className="tx-filter-category">
+                <span className="tx-ledger-label">Категория</span>
+                <select
+                  value={
+                    categoryFilter === "all" || categoryFilter === "none"
+                      ? categoryFilter
+                      : String(categoryFilter)
+                  }
+                  onChange={(event) =>
+                    setCategoryFilter(parseCategoryFilter(event.currentTarget.value))
+                  }
                 >
-                  {filter === "all"
-                    ? "Все"
-                    : filter === "expense"
-                      ? "Расходы"
-                      : filter === "income"
-                        ? "Доходы"
-                        : "Переводы"}
-                </button>
-              ))}
+                  <option value="all">Все категории</option>
+                  <option value="none">Без категории</option>
+                  {expenseCategories.length > 0 ? (
+                    <optgroup label="Расходы">
+                      {expenseCategories.map((category) => (
+                        <option key={`e-${category.id}`} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {incomeCategories.length > 0 ? (
+                    <optgroup label="Доходы">
+                      {incomeCategories.map((category) => (
+                        <option key={`i-${category.id}`} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                </select>
+                <span className="tx-filter-category-hint">{categoryFilterLabel}</span>
+              </label>
+            </div>
+
+            <div className="tx-filter-summary">
+              <div className="tx-filter-summary-main">
+                <div className="tx-filter-count">
+                  <strong className="mono">{filteredTransactions.length}</strong>
+                  <span>
+                    {filteredTransactions.length === 1
+                      ? "операция"
+                      : filteredTransactions.length > 1 &&
+                          filteredTransactions.length < 5
+                        ? "операции"
+                        : "операций"}
+                  </span>
+                </div>
+                {(categoryFilter !== "all" ||
+                  !monthOnly ||
+                  txFilter !== "all" ||
+                  txSearch.trim()) && (
+                  <div className="tx-filter-chips">
+                    {monthOnly ? (
+                      <span className="tx-filter-chip is-period">
+                        {formatYearMonthLabel(listMonth)}
+                      </span>
+                    ) : (
+                      <span className="tx-filter-chip is-period">Всё время</span>
+                    )}
+                    {categoryFilter !== "all" ? (
+                      <button
+                        type="button"
+                        className="tx-filter-chip is-category"
+                        onClick={() => setCategoryFilter("all")}
+                        title="Убрать фильтр категории"
+                      >
+                        <span>{categoryFilterLabel}</span>
+                        <em aria-hidden>×</em>
+                      </button>
+                    ) : null}
+                    {txFilter !== "all" ? (
+                      <button
+                        type="button"
+                        className={`tx-filter-chip is-${txFilter}`}
+                        onClick={() => setTxFilter("all")}
+                        title="Убрать фильтр типа"
+                      >
+                        <span>
+                          {txFilter === "expense"
+                            ? "Расходы"
+                            : txFilter === "income"
+                              ? "Доходы"
+                              : "Переводы"}
+                        </span>
+                        <em aria-hidden>×</em>
+                      </button>
+                    ) : null}
+                    {txSearch.trim() ? (
+                      <button
+                        type="button"
+                        className="tx-filter-chip"
+                        onClick={() => setTxSearch("")}
+                        title="Очистить поиск"
+                      >
+                        <span>«{txSearch.trim()}»</span>
+                        <em aria-hidden>×</em>
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+
+              <div className="tx-filter-summary-side">
+                {filteredTransactions.length > 0 ? (
+                  <div className="tx-filter-total">
+                    <span>Итого</span>
+                    <strong
+                      className={`mono ${
+                        filteredTotalMinor >= 0 ? "income" : "expense"
+                      }`}
+                    >
+                      {formatMoney(filteredTotalMinor, primaryCurrency)}
+                    </strong>
+                  </div>
+                ) : null}
+                {hasActiveScope || txSearch.trim() || txFilter !== "all" ? (
+                  <button
+                    type="button"
+                    className="ghost compact"
+                    onClick={resetScopeFilters}
+                  >
+                    Сбросить
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -581,9 +857,29 @@ export function TransactionsPanel({
             ))}
             {filteredTransactions.length === 0 && (
               <li className="empty transactions-empty">
-                {transactions.length === 0
-                  ? "История пуста. Запишите первую операцию слева."
-                  : "По этому запросу операций не найдено."}
+                {transactions.length === 0 ? (
+                  "История пуста. Запишите первую операцию слева."
+                ) : (
+                  <>
+                    <strong>В этой выборке пусто</strong>
+                    <span>
+                      {monthOnly
+                        ? `Нет операций за ${formatYearMonthLabel(listMonth)}`
+                        : "Нет операций"}
+                      {categoryFilter !== "all"
+                        ? ` · ${categoryFilterLabel}`
+                        : ""}
+                      .
+                    </span>
+                    <button
+                      type="button"
+                      className="ghost compact"
+                      onClick={resetScopeFilters}
+                    >
+                      Сбросить фильтры
+                    </button>
+                  </>
+                )}
               </li>
             )}
           </ul>

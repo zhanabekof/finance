@@ -563,21 +563,68 @@ fn api<T: serde::de::DeserializeOwned>(
     body: &serde_json::Value,
 ) -> Result<T, String> {
     let url = format!("{API}/bot{token}/{method}");
-    let response = ureq::post(&url)
-        .set("Content-Type", "application/json")
-        .send_json(body.clone())
-        .map_err(|e| format!("HTTP: {e}"))?;
-    let payload: TgResponse<T> = response
-        .into_json()
-        .map_err(|e| format!("JSON: {e}"))?;
-    if !payload.ok {
-        return Err(payload
-            .description
-            .unwrap_or_else(|| "Telegram API error".into()));
+    let timeout = if method == "getUpdates" {
+        std::time::Duration::from_secs(60)
+    } else {
+        std::time::Duration::from_secs(30)
+    };
+
+    let mut last_err = String::new();
+    for attempt in 1..=4 {
+        let result = (|| {
+            let tls = native_tls::TlsConnector::new()
+                .map_err(|e| format!("TLS: {e}"))?;
+            let agent = ureq::AgentBuilder::new()
+                .timeout(timeout)
+                .tls_connector(std::sync::Arc::new(tls))
+                .build();
+            let response = agent
+                .post(&url)
+                .set("Content-Type", "application/json")
+                .send_json(body.clone())
+                .map_err(|e| redact_token(&format!("HTTP: {e}"), token))?;
+            let payload: TgResponse<T> = response
+                .into_json()
+                .map_err(|e| format!("JSON: {e}"))?;
+            if !payload.ok {
+                return Err(payload
+                    .description
+                    .unwrap_or_else(|| "Telegram API error".into()));
+            }
+            payload
+                .result
+                .ok_or_else(|| "Telegram API: пустой result".into())
+        })();
+
+        match result {
+            Ok(value) => return Ok(value),
+            Err(err) => {
+                last_err = err;
+                let transient = last_err.contains("Connection")
+                    || last_err.contains("timeout")
+                    || last_err.contains("reset")
+                    || last_err.contains("TLS")
+                    || last_err.contains("tls")
+                    || last_err.contains("Temporary")
+                    || last_err.contains("handshake");
+                if !transient || attempt == 4 {
+                    break;
+                }
+                eprintln!(
+                    "finance-telegramd: {method} попытка {attempt}/4: {last_err}"
+                );
+                sleep_secs(attempt as u64);
+            }
+        }
     }
-    payload
-        .result
-        .ok_or_else(|| "Telegram API: пустой result".into())
+    Err(last_err)
+}
+
+fn redact_token(message: &str, token: &str) -> String {
+    if token.is_empty() {
+        return message.to_string();
+    }
+    message.replace(token, "***")
 }
 
 fn sleep_secs(secs: u64) {

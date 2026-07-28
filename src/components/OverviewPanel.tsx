@@ -25,6 +25,7 @@ type Props = {
   onYearMonthChange: (value: string) => void;
   onOpenBudget: () => void;
   onOpenTransactions: () => void;
+  onOpenCategory: (categoryId: number | null) => void;
 };
 
 function formatDate(iso: string): string {
@@ -55,6 +56,7 @@ export function OverviewPanel({
   onYearMonthChange,
   onOpenBudget,
   onOpenTransactions,
+  onOpenCategory,
 }: Props) {
   const { currency, month, yearFlow, monthBudget, yearBudget, alerts, accounts, recentTransactions } =
     analytics;
@@ -284,22 +286,37 @@ export function OverviewPanel({
             <ul className="share-list">
               {month.expenseCategories.map((row, index) => (
                 <li key={`${row.categoryId ?? "none"}-${row.categoryName}`}>
-                  <div className="share-rank">{String(index + 1).padStart(2, "0")}</div>
-                  <div className="share-content">
-                    <div className="share-meta">
-                      <strong>
-                        {row.categoryName}
-                        {row.isEssential && <span className="tag">обязательно</span>}
-                      </strong>
-                      <span className="mono">
-                        {formatMoney(row.amountMinor, currency)}
+                  <button
+                    type="button"
+                    className="share-row-button"
+                    onClick={() => onOpenCategory(row.categoryId)}
+                    title={`Операции: ${row.categoryName}`}
+                  >
+                    <span className="share-rank" aria-hidden>
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="share-content">
+                      <span className="share-meta">
+                        <strong>
+                          {row.categoryName}
+                          {row.isEssential ? (
+                            <span className="tag">обязательно</span>
+                          ) : null}
+                        </strong>
+                        <span className="mono">
+                          {formatMoney(row.amountMinor, currency)}
+                        </span>
                       </span>
-                    </div>
-                    <div className="share-track">
-                      <i style={{ width: `${Math.min(row.shareRatio * 100, 100)}%` }} />
-                      <span>{formatPercent(row.shareRatio)}</span>
-                    </div>
-                  </div>
+                      <span className="share-track">
+                        <i
+                          style={{
+                            width: `${Math.min(Math.max(row.shareRatio, 0) * 100, 100)}%`,
+                          }}
+                        />
+                        <span>{formatPercent(row.shareRatio)}</span>
+                      </span>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
